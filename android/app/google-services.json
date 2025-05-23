@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "934677057294",
+    "firebase_url": "https://thinktwice-clzy-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "thinktwice-clzy",
+    "storage_bucket": "thinktwice-clzy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:934677057294:android:03e50675bdd7bae907115f",
+        "android_client_info": {
+          "package_name": "com.clzyapp.thinktwice"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOObuTi3EH-boRpVX6-z5-VGxo8ZLhboQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
