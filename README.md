@@ -1,4 +1,4 @@
-# thinktwice
+# ThinkTwice
 
 Expenses Sharing and Travel Tips Sharing App
 
