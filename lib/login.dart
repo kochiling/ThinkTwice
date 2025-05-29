@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:thinktwice/nagivation_bar.dart';
 import 'package:thinktwice/sign_up_page.dart';
 import 'auth_service.dart';
 import 'package:thinktwice/home_page.dart';
@@ -30,7 +31,8 @@ class _LoginPageState extends State<LoginPage>{
 
   goToHome(BuildContext context) => Navigator.pushReplacement(
     context,
-    MaterialPageRoute(builder: (context) => HomePage()),
+    //MaterialPageRoute(builder: (context) => HomePage()),
+    MaterialPageRoute(builder: (context) => CurveBar()),
   );
 
   _login() async {
