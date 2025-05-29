@@ -5,14 +5,14 @@ import 'package:thinktwice/home_page.dart';
 import 'package:thinktwice/login.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:thinktwice/nagivation_bar.dart';
 import 'firebase_options.dart';
 
 // DON'T TOUCH THIS PART THANKS <3
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    name: 'thinktwice-clzy',
+    //name: 'thinktwice-clzy',
     options: FirebaseOptions(
       apiKey: 'AIzaSyAOObuTi3EH-boRpVX6-z5-VGxo8ZLhboQ',
       appId: '1:934677057294:android:03e50675bdd7bae907115f',
@@ -53,7 +53,7 @@ class _MyAppState extends State <MyApp>{
             if (user == null) {
               return const LoginPage();
             } else {
-              return HomePage(); // Go directly to home if already logged in
+              return CurveBar();// Go directly to home if already logged in
             }
           }
           return Scaffold(

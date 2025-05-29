@@ -25,72 +25,47 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build (BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Try ME"),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            const SizedBox(
-              height: 30,
-            ),
-            const Text(
-              'Firebase Realtime Database Series in Flutter 2022',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(
-              height: 30,
-            ),
-            const SizedBox(
-              height: 30,
-            ),
-            MaterialButton(
-              onPressed: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const FetchData()));
-              },
-              child: const Text('Fetch Data'),
-              color: Colors.blue,
-              textColor: Colors.white,
-              minWidth: 300,
-              height: 40,
-            ),
-            MaterialButton(
-              onPressed: () async {
-                await _auth.signout();
-                goToLogin(context);
-              },
-              child: const Text('Log Out'),
-              color: Colors.blue,
-              textColor: Colors.white,
-              minWidth: 300,
-              height: 40,
-            ),
-          ],
+    return SafeArea(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text("Think Twice"),
         ),
-      ),
-
-      floatingActionButton: FloatingActionButton(
-          onPressed: (){
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (child) => InsertPage(),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+      
+              MaterialButton(
+                onPressed: () async {
+                  await _auth.signout();
+                  goToLogin(context);
+                },
+                child: const Text('Log Out'),
+                color: Colors.blue,
+                textColor: Colors.white,
+                minWidth: 300,
+                height: 40,
               ),
-            );
-          },
-          child: const Icon(
-              Icons.add
-          )
+            ],
+          ),
+        ),
+      
+        floatingActionButton: FloatingActionButton(
+            onPressed: (){
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (child) => InsertPage(),
+                ),
+              );
+            },
+            child: const Icon(
+                Icons.add
+            )
+        ),
+      
       ),
-
     );
   }
 }
