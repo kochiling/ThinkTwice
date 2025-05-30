@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:thinktwice/currency_api.dart';
 
 
 class CreateGroup extends StatefulWidget {
@@ -33,13 +34,29 @@ class _CreateGroupState extends State<CreateGroup> {
   bool isSearching = false;
   final currentUser = FirebaseAuth.instance.currentUser;
 
+  List<String> currencyCodes = [];
+
   @override
   void initState() {
     super.initState();
     if (currentUser != null) {
       selectedMemberUIDs.add(currentUser!.uid); // Ensure current user is added
     }
+    loadCurrencyList();
   }
+
+  Future<void> loadCurrencyList() async {
+    try {
+      final codes = await CurrencyApi.getCurrencies();
+      setState(() {
+        currencyCodes = codes;
+        selectedCurrency = codes.contains("MYR") ? "MYR" : codes.first;
+      });
+    } catch (e) {
+      print("Error loading currencies: $e");
+    }
+  }
+
   void _searchUsers(String query) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     final ref = FirebaseDatabase.instance.ref().child('Users');
@@ -224,20 +241,7 @@ class _CreateGroupState extends State<CreateGroup> {
     );
   }
 
-
-
   Widget _buildCurrencyStep() {
-    final currencies = {
-      'AUD': 'Australian Dollar',
-      'EUR': 'Euro',
-      'MYR': 'Malaysian Ringgit',
-      'USD': 'US Dollar',
-      'JPY': 'Japanese Yen',
-      'GBP': 'British Pound',
-      'SGD': 'Singapore Dollar',
-      'THB': 'Thai Baht',
-      'INR': 'Indian Rupee',
-    };
     return Center(
       child: Column(
         children: [
@@ -248,23 +252,18 @@ class _CreateGroupState extends State<CreateGroup> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 25, fontFamily: 'ComicSans'),
             ),
           ),
-          // const Padding(
-          //   padding: EdgeInsets.only(right: 3, left: 3, top: 10 , bottom: 1),
-          //   child: Text(
-          //     "It will be the currency of your bank account",
-          //     style: TextStyle(fontSize: 15, fontFamily: 'ComicSans'),
-          //   ),
-          // ),
           const Padding(
-            padding: EdgeInsets.only(right: 3, left: 3, top: 1 , bottom: 50),
+            padding: EdgeInsets.only(right: 3, left: 3, bottom: 50),
             child: Text(
-              "All amounts will automatically converted to this currency",
+              "All amounts will automatically be converted to this currency",
               style: TextStyle(fontSize: 15, fontFamily: 'ComicSans'),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 8, left: 8, top: 1, bottom: 50),
-            child: DropdownButtonFormField<String>(
+            padding: const EdgeInsets.only(right: 8, left: 8, bottom: 50),
+            child: currencyCodes.isEmpty
+                ? CircularProgressIndicator()
+                : DropdownButtonFormField<String>(
               value: selectedCurrency,
               decoration: InputDecoration(
                 labelText: "Select Currency",
@@ -274,10 +273,10 @@ class _CreateGroupState extends State<CreateGroup> {
                 filled: true,
                 fillColor: Colors.white,
               ),
-              items: currencies.entries.map((entry) {
+              items: currencyCodes.map((code) {
                 return DropdownMenuItem<String>(
-                  value: entry.key, // Save only the abbreviation
-                  child: Text("${entry.value} (${entry.key})"), // Show full name
+                  value: code,
+                  child: Text(code),
                 );
               }).toList(),
               onChanged: (value) {
@@ -291,6 +290,72 @@ class _CreateGroupState extends State<CreateGroup> {
       ),
     );
   }
+
+  // Widget _buildCurrencyStep() {
+  //   final currencies = {
+  //     'AUD': 'Australian Dollar',
+  //     'EUR': 'Euro',
+  //     'MYR': 'Malaysian Ringgit',
+  //     'USD': 'US Dollar',
+  //     'JPY': 'Japanese Yen',
+  //     'GBP': 'British Pound',
+  //     'SGD': 'Singapore Dollar',
+  //     'THB': 'Thai Baht',
+  //     'INR': 'Indian Rupee',
+  //   };
+  //   return Center(
+  //     child: Column(
+  //       children: [
+  //         const Padding(
+  //           padding: EdgeInsets.only(right: 3, left: 3, top: 50, bottom: 10),
+  //           child: Text(
+  //             "Pick Your Home Currency 💱",
+  //             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 25, fontFamily: 'ComicSans'),
+  //           ),
+  //         ),
+  //         // const Padding(
+  //         //   padding: EdgeInsets.only(right: 3, left: 3, top: 10 , bottom: 1),
+  //         //   child: Text(
+  //         //     "It will be the currency of your bank account",
+  //         //     style: TextStyle(fontSize: 15, fontFamily: 'ComicSans'),
+  //         //   ),
+  //         // ),
+  //         const Padding(
+  //           padding: EdgeInsets.only(right: 3, left: 3, top: 1 , bottom: 50),
+  //           child: Text(
+  //             "All amounts will automatically converted to this currency",
+  //             style: TextStyle(fontSize: 15, fontFamily: 'ComicSans'),
+  //           ),
+  //         ),
+  //         Padding(
+  //           padding: const EdgeInsets.only(right: 8, left: 8, top: 1, bottom: 50),
+  //           child: DropdownButtonFormField<String>(
+  //             value: selectedCurrency,
+  //             decoration: InputDecoration(
+  //               labelText: "Select Currency",
+  //               border: OutlineInputBorder(
+  //                 borderRadius: BorderRadius.circular(10),
+  //               ),
+  //               filled: true,
+  //               fillColor: Colors.white,
+  //             ),
+  //             items: currencies.entries.map((entry) {
+  //               return DropdownMenuItem<String>(
+  //                 value: entry.key, // Save only the abbreviation
+  //                 child: Text("${entry.value} (${entry.key})"), // Show full name
+  //               );
+  //             }).toList(),
+  //             onChanged: (value) {
+  //               setState(() {
+  //                 selectedCurrency = value;
+  //               });
+  //             },
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildMemberStep() {
     return Padding(
