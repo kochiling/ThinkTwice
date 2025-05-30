@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:thinktwice/group_model.dart';
+import 'package:thinktwice/group_detail_page.dart';
 
 class GroupCard extends StatelessWidget{
   final GroupModel groupModel;
@@ -28,7 +29,15 @@ class GroupCard extends StatelessWidget{
         ),
         //trailing: const Icon(Icons.arrow_forward_ios),
         onTap: () {
-          // handle tap
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupDetailsPage(
+                groupId: groupModel.id,
+                homeCurrency: groupModel.homeCurrency,
+              ),
+            ),
+          );
         },
       ),
     );
