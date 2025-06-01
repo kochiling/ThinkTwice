@@ -1,12 +1,14 @@
 import 'dart:developer';
-
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:thinktwice/home_page.dart';
 import 'package:thinktwice/login.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:thinktwice/nagivation_bar.dart';
+import 'package:image_picker/image_picker.dart';
 
 
 class SignUpPage extends StatefulWidget{
@@ -21,10 +23,12 @@ class SignUpPage extends StatefulWidget{
 class _SignUpPageState extends State<SignUpPage> {
 
   final _auth = AuthService();
+  bool _isLoading = false;
 
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _obscureText = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   final _name = TextEditingController();
   final _confirmpassword = TextEditingController();
   String? selectedCountryName;
@@ -34,6 +38,10 @@ class _SignUpPageState extends State<SignUpPage> {
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
+
+  File? _imageFile;
+  UploadTask? uploadTask;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -53,7 +61,8 @@ class _SignUpPageState extends State<SignUpPage> {
 
   goToHome(BuildContext context) => Navigator.push(
     context,
-    MaterialPageRoute(builder: (context) => const HomePage()),
+    //MaterialPageRoute(builder: (context) => const HomePage()),
+    MaterialPageRoute(builder: (context) => CurveBar()),
   );
 
   void _validatePassword() {
@@ -85,29 +94,99 @@ class _SignUpPageState extends State<SignUpPage> {
   });
 }
 
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text("Choose from Gallery"),
+            onTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.gallery);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text("Take a Photo"),
+            onTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.camera);
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final pickedFile = await _picker.pickImage(source: source);
 
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
 
-_signup() async {
+  // void _saveImage () async {
+  //
+  //   final imgDb = FirebaseStorage.instance.ref().child('Profile_Images/${_imageFile?.path}');
+  //
+  //   uploadTask = imgDb.putFile(_imageFile!);
+  //
+  //   final snapshot = await uploadTask!.whenComplete(()=>null);
+  //
+  //   final downloadUrl = await snapshot.ref.getDownloadURL();
+  //
+  //   log("${downloadUrl}");
+  //
+  // }
+
+  _signup() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final user = await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
       if (user != null) {
         final uid = FirebaseAuth.instance.currentUser?.uid;
-
-        // Reference to the Realtime Database
         late DatabaseReference dbref = FirebaseDatabase.instance.ref();
+
+        String imageUrl = 'https://firebasestorage.googleapis.com/v0/b/thinktwice-clzy.firebasestorage.app/o/profile_pic.jpg?alt=media&token=9f2634b8-b271-4f74-923c-36161d2f728a';
+        //String imageUrl = 'https://firebasestorage.googleapis.com/v0/b/thinktwice-clzy.firebasestorage.app/o/profile_pic.jpg?alt=media&token=9f2634b8-b271-4f74-923c-36161d2f728a';
+
+        if (_imageFile != null) {
+          // Upload image
+          final imgRef = FirebaseStorage.instance
+              .ref()
+              .child('Profile_Images/$uid.jpg'); // Use UID as filename
+          uploadTask = imgRef.putFile(_imageFile!);
+          final snapshot = await uploadTask!.whenComplete(() => null);
+          imageUrl = await snapshot.ref.getDownloadURL();
+          log("Custom image uploaded: $imageUrl");
+        } else {
+          log("No image selected. Using default image.");
+        }
 
         // Save user data
         await dbref.child('Users').child(uid!).set({
           'id': uid,
           'username': _name.text,
           'email': _email.text,
-          'country': selectedCountryName ?? '',
+          //'country': selectedCountryName ?? '',
+          'country': selectedCountryName?.isNotEmpty == true ? selectedCountryName : 'Malaysia',
+          'profile_pic': imageUrl,
         });
 
         log("User created and data saved successfully");
-        log(uid);
         goToHome(context);
+
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
       log("Sign Up Error: $e");
@@ -116,6 +195,38 @@ _signup() async {
       );
     }
   }
+
+
+
+// _signup() async {
+//     try {
+//       final user = await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
+//       if (user != null) {
+//         final uid = FirebaseAuth.instance.currentUser?.uid;
+//
+//         // Reference to the Realtime Database
+//         late DatabaseReference dbref = FirebaseDatabase.instance.ref();
+//
+//         // Save user data
+//         await dbref.child('Users').child(uid!).set({
+//           'id': uid,
+//           'username': _name.text,
+//           'email': _email.text,
+//           'country': selectedCountryName ?? '',
+//           'profile_pic': '',
+//         });
+//
+//         log("User created and data saved successfully");
+//         log(uid);
+//         goToHome(context);
+//       }
+//     } catch (e) {
+//       log("Sign Up Error: $e");
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text("Sign Up Failed: ${e.toString()}")),
+//       );
+//     }
+//   }
 
 
   void _handleSignUp() {
@@ -140,6 +251,7 @@ _signup() async {
   Widget build (BuildContext context){
     return Scaffold(
         backgroundColor: Colors.white,
+
         body: SafeArea(
             child: SingleChildScrollView(
                 child: Center(
@@ -157,6 +269,19 @@ _signup() async {
                         padding: EdgeInsets.all(8.0),
                         child: Text("Sign Up Now",
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30, fontFamily: 'ComicSans'),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: _showImageSourceDialog,
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundImage: _imageFile != null
+                              ? FileImage(_imageFile!)
+                              : null,
+                          child: _imageFile == null
+                              ? const Icon(Icons.person_2_rounded, size: 40)
+                              : null,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -213,19 +338,19 @@ _signup() async {
                         padding: const EdgeInsets.all(8.0),
                         child: TextField(
                           controller: _password,
-                          obscureText: _obscureText,
+                          obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: "Password",
                             errorText: _passwordError,
                             prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFFE991AA)),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureText ? Icons.visibility_off : Icons.visibility,
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
                                 color: Colors.grey,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _obscureText = !_obscureText;
+                                  _obscurePassword= !_obscurePassword;
                                 });
                               },
                             ),
@@ -249,19 +374,19 @@ _signup() async {
                         padding: const EdgeInsets.all(8.0),
                         child: TextField(
                           controller: _confirmpassword,
-                          obscureText: _obscureText,
+                          obscureText: _obscureConfirmPassword,
                           decoration: InputDecoration(
                             hintText: "Confirm Password",
                             errorText: _confirmPasswordError,
                             prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFFE991AA)),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureText ? Icons.visibility_off : Icons.visibility,
+                                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                                 color: Colors.grey,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _obscureText = !_obscureText;
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
                                 });
                               },
                             ),
@@ -379,8 +504,14 @@ _signup() async {
                             ),
                           ],
                         ),
-                      )
-
+                      ),
+                      if (_isLoading)
+                        Container(
+                          color: Color(0xFFE991AA),
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
                     ],
               ),
             )
