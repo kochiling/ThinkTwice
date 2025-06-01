@@ -77,7 +77,6 @@ class _HomePageState extends State<HomePage> {
               minWidth: 300,
               height: 40,
             ),
-
           ],
         ),
       ),
