@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:thinktwice/tips_details.dart';
+import 'package:thinktwice/gemini.dart';
 
 class TravelTipsPage extends StatefulWidget {
   const TravelTipsPage({Key? key}) : super(key: key);
@@ -70,6 +71,18 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
           return _buildTripCard(trip);
         },
       ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GeminiPage()),
+          );
+        },
+        child: const Icon(Icons.chat),
+        backgroundColor: Colors.blue,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
