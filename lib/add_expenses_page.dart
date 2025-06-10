@@ -22,6 +22,33 @@ class _AddExpensePageState extends State<AddExpensePage> {
   String amount = '';
   String paidBy = '';
   List<String> selectedUsers = [];
+  bool splitEqually = true;
+  Map<String, String> manualAmounts = {}; // userId -> amount string
+
+  String selectedCategory = '';
+  String otherCategory = '';
+
+  final List<Map<String, dynamic>> categories = [
+    {'icon': Icons.fastfood, 'label': 'Food'},
+    {'icon': Icons.local_cafe, 'label': 'Cafe'},
+    {'icon': Icons.directions_bus, 'label': 'Transport'},
+    {'icon': Icons.local_mall, 'label': 'Shopping'},
+    {'icon': Icons.home, 'label': 'Rent'},
+    {'icon': Icons.movie, 'label': 'Entertainment'},
+    {'icon': Icons.hotel, 'label': 'Accommodation'},
+    {'icon': Icons.flight, 'label': 'Flight'},
+    {'icon': Icons.medical_services, 'label': 'Medical'},
+    {'icon': Icons.school, 'label': 'Education'},
+    {'icon': Icons.sports_soccer, 'label': 'Sports'},
+    {'icon': Icons.nightlife, 'label': 'Nightlife'},
+    {'icon': Icons.pets, 'label': 'Pet'},
+    {'icon': Icons.phone_android, 'label': 'Phone/Internet'},
+    {'icon': Icons.receipt_long, 'label': 'Bills'},
+    {'icon': Icons.celebration, 'label': 'Gifts'},
+    {'icon': Icons.handshake, 'label': 'Donations'},
+    {'icon': Icons.more_horiz, 'label': 'Others'},
+  ];
+
 
   @override
   void initState() {
@@ -60,18 +87,54 @@ class _AddExpensePageState extends State<AddExpensePage> {
       return;
     }
 
+    if (selectedCategory.isEmpty || (selectedCategory == 'Others' && otherCategory.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select or enter a category.")),
+      );
+      return;
+    }
+
+    double? totalAmount = double.tryParse(amount);
+    if (totalAmount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid total amount.")),
+      );
+      return;
+    }
+
+    if (!splitEqually) {
+      double manualTotal = 0;
+      for (String userId in selectedUsers) {
+        double? userAmount = double.tryParse(manualAmounts[userId] ?? '');
+        if (userAmount == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Invalid amount for \${memberNames[userId] ?? userId}")),
+          );
+          return;
+        }
+        manualTotal += userAmount;
+      }
+
+      if ((manualTotal - totalAmount).abs() > 0.01) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Manual amounts must add up to correct total")),
+        );
+        return;
+      }
+    }
+
     final expense = {
       'title': title.trim(),
-      'amount': double.tryParse(amount) ?? 0,
+      'amount': totalAmount,
       'paidBy': paidBy,
       'splitAmong': selectedUsers,
+      'splitEqually': splitEqually,
+      'manualAmounts': splitEqually ? null : manualAmounts,
       'timestamp': ServerValue.timestamp,
+      'category': selectedCategory == 'Others' ? otherCategory.trim() : selectedCategory,
     };
 
-    await _database
-        .ref('Groups/${widget.groupId}/expenses')
-        .push()
-        .set(expense);
+    await _database.ref('Groups/${widget.groupId}/expenses').push().set(expense);
 
     Navigator.pop(context);
   }
@@ -79,10 +142,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDE2E4), // Light pink
+      backgroundColor: const Color(0xFFFDE2E4),
       appBar: AppBar(
         title: const Text("Add Expense"),
-        backgroundColor: const Color(0xFFB388EB), // Lighter purple
+        backgroundColor: const Color(0xFFB388EB),
       ),
       body: memberNames.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -111,12 +174,53 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (val) {
-                  // Only allow valid double inputs (digits and at most one dot)
                   if (val.isEmpty || RegExp(r'^\d*\.?\d*$').hasMatch(val)) {
                     amount = val;
                   }
                 },
               ),
+              const SizedBox(height: 16),
+              const Text("Category:", style: TextStyle(fontWeight: FontWeight.bold)),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: categories.map((cat) {
+                  final label = cat['label'] as String;
+                  final icon = cat['icon'] as IconData;
+                  final isSelected = selectedCategory == label;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedCategory = label;
+                        otherCategory = '';
+                      });
+                    },
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: isSelected ? Color(0xFFB388EB) : Colors.grey[300],
+                          child: Icon(icon, color: Colors.white),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(label),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+              if (selectedCategory == 'Others')
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      labelText: "Enter category",
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Color(0xFFFAD2E1),
+                    ),
+                    onChanged: (val) => otherCategory = val,
+                  ),
+                ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: paidBy,
@@ -139,29 +243,78 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 },
               ),
               const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text("Split Type:", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Radio<bool>(
+                          value: true,
+                          groupValue: splitEqually,
+                          onChanged: (val) => setState(() => splitEqually = val!),
+                        ),
+                        const Text("Equally"),
+                        Radio<bool>(
+                          value: false,
+                          groupValue: splitEqually,
+                          onChanged: (val) => setState(() => splitEqually = val!),
+                        ),
+                        const Text("Manually"),
+                      ],
+                    ),
+                  )
+                ],
+              ),
+              const SizedBox(height: 10),
               const Text(
                 "Split Among:",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: Color(0xFFB388EB), // Lighter purple
+                  color: Color(0xFFB388EB),
                 ),
               ),
               Column(
                 children: memberNames.entries.map((entry) {
-                  return CheckboxListTile(
-                    title: Text(entry.value),
-                    activeColor: const Color(0xFFB388EB),
-                    value: selectedUsers.contains(entry.key),
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == true) {
-                          selectedUsers.add(entry.key);
-                        } else {
-                          selectedUsers.remove(entry.key);
-                        }
-                      });
-                    },
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CheckboxListTile(
+                        title: Text(entry.value),
+                        activeColor: const Color(0xFFB388EB),
+                        value: selectedUsers.contains(entry.key),
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              selectedUsers.add(entry.key);
+                            } else {
+                              selectedUsers.remove(entry.key);
+                              manualAmounts.remove(entry.key);
+                            }
+                          });
+                        },
+                      ),
+                      if (!splitEqually && selectedUsers.contains(entry.key))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              labelText: "\${entry.value}'s share",
+                              border: const OutlineInputBorder(),
+                              filled: true,
+                              fillColor: const Color(0xFFFAD2E1),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (val) {
+                              setState(() {
+                                manualAmounts[entry.key] = val;
+                              });
+                            },
+                          ),
+                        )
+                    ],
                   );
                 }).toList(),
               ),
@@ -170,8 +323,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB388EB),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
