@@ -19,16 +19,30 @@ class CurrencyApi {
     }
   }
 
-  /// Get exchange rate from one currency to another
+  // /// Get exchange rate from one currency to another
+  // static Future<double> getExchangeRate(String from, String to) async {
+  //   final url = Uri.parse('$_baseUrl/$_apiKey/pair/$from/$to');
+  //   final response = await http.get(url);
+  //
+  //   if (response.statusCode == 200) {
+  //     final data = json.decode(response.body);
+  //     return data['conversion_rate'];
+  //   } else {
+  //     throw Exception('Failed to fetch exchange rate');
+  //   }
+  // }
+
   static Future<double> getExchangeRate(String from, String to) async {
     final url = Uri.parse('$_baseUrl/$_apiKey/pair/$from/$to');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['conversion_rate'];
+      final rate = data['conversion_rate'];
+      return rate is int ? rate.toDouble() : rate;
     } else {
       throw Exception('Failed to fetch exchange rate');
     }
   }
+
 }

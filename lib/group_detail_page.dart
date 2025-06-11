@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:thinktwice/add_expenses_page.dart';
+import 'package:thinktwice/expenses_details_page.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -157,6 +158,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
             MaterialPageRoute(
               builder: (context) => AddExpensePage(
                 groupId: widget.groupId,
+                homeCurrency: widget.homeCurrency,
+
               ),
             ),
           );
@@ -224,12 +227,15 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         final amount = double.tryParse(expense['amount'].toString()) ?? 0.0;
         final paidById = expense['paidBy'] ?? '';
         final paidBy = memberNames[paidById] ?? paidById;
-        final formattedAmount = "${widget.homeCurrency} ${amount.toStringAsFixed(2)}";
+        //final formattedAmount = "${widget.homeCurrency} ${amount.toStringAsFixed(2)}";
         final category = expense['category'] ?? 'Others';
         final icon = categoryIcons[category] ?? Icons.monetization_on_outlined;
         final splitEqually = expense['splitEqually'] ?? true;
+        final fromCurrency = expense['fromCurrency'] ?? '';
+        final amount_ori = double.tryParse(expense['amount_ori'].toString()) ?? 0.0;
+        final formattedAmount = "$fromCurrency ${amount_ori.toStringAsFixed(2)}";
 
-        // 🔽 Split description logic
+        // Split description logic
         String splitDescription;
         if (splitEqually) {
           final List<dynamic> splitAmong = expense['splitAmong'] ?? [];
@@ -240,7 +246,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
           final splits = manualAmounts.entries.map((e) {
             final name = memberNames[e.key] ?? e.key;
             final value = double.tryParse(e.value.toString())?.toStringAsFixed(2) ?? '0.00';
-            return "$name (${widget.homeCurrency} $value)";
+            return "$name ($fromCurrency $value)";
           }).join(', ');
           splitDescription = "Split manually: $splits";
         }
@@ -257,9 +263,20 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               color: Color(0xFF9D4EDD),
             ),
           ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ExpenseDetailsPage(
+                  expense: expense,
+                  memberNames: memberNames,
+                  homeCurrency: widget.homeCurrency,
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
-
 }
