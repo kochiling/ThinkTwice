@@ -127,35 +127,6 @@ class _GroupPageState extends State <GroupPage>{
     );
   }
 
-  // void _joinGroup(){
-  //   final TextEditingController groupCodeText = TextEditingController();
-  //
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text("Join Group"),
-  //       content: TextField(
-  //         controller: groupCodeText,
-  //         decoration: const InputDecoration(
-  //           labelText: "Enter group code to join",
-  //         ),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.of(context).pop(),
-  //           child: const Text("Cancel"),
-  //         ),
-  //         TextButton(
-  //           onPressed: () async {
-  //
-  //           },
-  //           child: const Text("Send"),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
   void _joinGroup() {
     final TextEditingController groupCodeText = TextEditingController();
 

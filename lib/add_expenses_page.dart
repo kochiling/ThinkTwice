@@ -1,11 +1,16 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:thinktwice/currency_api.dart';
+import 'package:thinktwice/currency_picker.dart';
 
 class AddExpensePage extends StatefulWidget {
   final String groupId;
+  final String homeCurrency;
 
-  const AddExpensePage({Key? key, required this.groupId}) : super(key: key);
+  const AddExpensePage({Key? key, required this.groupId, required this.homeCurrency }) : super(key: key);
 
   @override
   State<AddExpensePage> createState() => _AddExpensePageState();
@@ -27,6 +32,12 @@ class _AddExpensePageState extends State<AddExpensePage> {
 
   String selectedCategory = '';
   String otherCategory = '';
+
+  String fromCurrency = '';
+  String toCurrency = '';
+  double rate = 1.0; // default to 1// e.g., 'MYR'
+  bool isEditingCurrency = false;
+
 
   final List<Map<String, dynamic>> categories = [
     {'icon': Icons.fastfood, 'label': 'Food'},
@@ -55,7 +66,28 @@ class _AddExpensePageState extends State<AddExpensePage> {
     super.initState();
     currentUserId = _auth.currentUser?.uid;
     _loadGroupMembers();
+
+    fromCurrency = widget.homeCurrency;
+    toCurrency = widget.homeCurrency;
+
+    print(fromCurrency + "and" + toCurrency);
+
+
   }
+
+  Future<void> _initExchangeRate() async {
+    try {
+      final fetchedRate = await CurrencyApi.getExchangeRate(fromCurrency, toCurrency);
+      setState(() {
+        rate = fetchedRate;
+      });
+      print('1 $fromCurrency = $rate $toCurrency');
+    } catch (e) {
+      print('Failed to fetch exchange rate: $e');
+      // Handle gracefully if needed
+    }
+  }
+
 
   void _loadGroupMembers() {
     final membersRef = _database.ref('Groups/${widget.groupId}/members');
@@ -80,6 +112,9 @@ class _AddExpensePageState extends State<AddExpensePage> {
   }
 
   Future<void> _addExpense() async {
+    await _initExchangeRate();
+    print("Rate: $rate");
+
     if (title.trim().isEmpty || amount.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Title and amount cannot be empty!")),
@@ -102,36 +137,71 @@ class _AddExpensePageState extends State<AddExpensePage> {
       return;
     }
 
+    final convertedTotal = totalAmount * rate;
+    print("Converted Amount");
+    print(convertedTotal);
+
+    Map<String, String>? convertedManualAmounts;
     if (!splitEqually) {
-      double manualTotal = 0;
+      double convertedManualTotal = 0;
+      convertedManualAmounts = {};
+
       for (String userId in selectedUsers) {
-        double? userAmount = double.tryParse(manualAmounts[userId] ?? '');
-        if (userAmount == null) {
+        double? rawAmount = double.tryParse(manualAmounts[userId] ?? '');
+        if (rawAmount == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Invalid amount for \${memberNames[userId] ?? userId}")),
+            SnackBar(content: Text("Invalid amount for ${memberNames[userId] ?? userId}")),
           );
           return;
         }
-        manualTotal += userAmount;
+
+        double converted = rawAmount * rate;
+        convertedManualTotal += converted;
+        convertedManualAmounts[userId] = converted.toStringAsFixed(2);
       }
 
-      if ((manualTotal - totalAmount).abs() > 0.01) {
+      if ((convertedManualTotal - convertedTotal).abs() > 0.01) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Manual amounts must add up to correct total")),
+          SnackBar(content: Text("Converted manual amounts must add up to converted total")),
         );
         return;
       }
     }
 
+    // if (!splitEqually) {
+    //   double manualTotal = 0;
+    //   for (String userId in selectedUsers) {
+    //     double? userAmount = double.tryParse(manualAmounts[userId] ?? '');
+    //     if (userAmount == null) {
+    //       ScaffoldMessenger.of(context).showSnackBar(
+    //         SnackBar(content: Text("Invalid amount for \${memberNames[userId] ?? userId}")),
+    //       );
+    //       return;
+    //     }
+    //     manualTotal += userAmount;
+    //   }
+    //
+    //   if ((manualTotal - totalAmount).abs() > 0.01) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text("Manual amounts must add up to correct total")),
+    //     );
+    //     return;
+    //   }
+    // }
+
     final expense = {
       'title': title.trim(),
-      'amount': totalAmount,
+      'amount': convertedTotal,
+      'amount_ori': totalAmount,
       'paidBy': paidBy,
       'splitAmong': selectedUsers,
       'splitEqually': splitEqually,
-      'manualAmounts': splitEqually ? null : manualAmounts,
+      'manualAmounts': splitEqually ? null : convertedManualAmounts,
+      'manualAmounts_ori': splitEqually ? null : manualAmounts,
       'timestamp': ServerValue.timestamp,
       'category': selectedCategory == 'Others' ? otherCategory.trim() : selectedCategory,
+      'fromCurrency': fromCurrency,
+      'rate': rate,
     };
 
     await _database.ref('Groups/${widget.groupId}/expenses').push().set(expense);
@@ -179,6 +249,42 @@ class _AddExpensePageState extends State<AddExpensePage> {
                   }
                 },
               ),
+
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () async {
+                  final selectedCurrency = await showModalBottomSheet<String>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => CurrencySelectorBottomSheet(
+                      currentFrom: fromCurrency,
+                      currentTo: toCurrency,
+                      onCurrencySelected: (newCurrency) {
+                        Navigator.pop(context, newCurrency);
+                      },
+                    ),
+                  );
+
+                  if (selectedCurrency != null) {
+                    setState(() {
+                      fromCurrency = selectedCurrency;
+                    });
+                  }
+                },
+                child: AbsorbPointer(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      labelText: "Currency",
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: const Color(0xFFFAD2E1),
+                    ),
+                    controller: TextEditingController(text: fromCurrency),
+                    readOnly: true,
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 16),
               const Text("Category:", style: TextStyle(fontWeight: FontWeight.bold)),
               Wrap(
@@ -301,6 +407,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                           child: TextField(
                             decoration: InputDecoration(
+                              prefixText: fromCurrency,
                               labelText: "\${entry.value}'s share",
                               border: const OutlineInputBorder(),
                               filled: true,
