@@ -18,7 +18,6 @@ class _CurveBarState extends State<CurveBar> {
   final screen = const [
     HomePage(),
     GroupPage(),
-    FetchData(),
     ProfilePage(),
   ];
 
@@ -26,7 +25,6 @@ class _CurveBarState extends State<CurveBar> {
   Widget build(BuildContext context) {
     final items = [
       const Icon(Icons.home, size: 30),
-      const Icon(Icons.wallet_travel, size: 30),
       const Icon(Icons.monetization_on_outlined, size: 30),
       const Icon(Icons.person, size: 30),
     ];

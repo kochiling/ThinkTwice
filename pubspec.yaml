@@ -47,7 +47,11 @@ dependencies:
   share_plus: ^11.0.0
   http: ^1.4.0
   lucide_icons: ^0.257.0
-  photo_view: 0.14.0
+  photo_view: ^0.14.0
+  excel: ^2.0.10
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.1
+  open_file: ^3.5.10
 
 
 dev_dependencies:

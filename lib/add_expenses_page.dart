@@ -168,6 +168,29 @@ class _AddExpensePageState extends State<AddExpensePage> {
       }
     }
 
+    final expenseRef = _database.ref('Groups/${widget.groupId}/expenses').push();
+    final expenseId = expenseRef.key; // This is the generated expense ID
+
+    final expense = {
+      'expense_id': expenseId, // Save it inside the expense data
+      'title': title.trim(),
+      'amount': convertedTotal,
+      'amount_ori': totalAmount,
+      'paidBy': paidBy,
+      'splitAmong': selectedUsers,
+      'splitEqually': splitEqually,
+      'manualAmounts': splitEqually ? null : convertedManualAmounts,
+      'manualAmounts_ori': splitEqually ? null : manualAmounts,
+      'timestamp': ServerValue.timestamp,
+      'category': selectedCategory == 'Others' ? otherCategory.trim() : selectedCategory,
+      'fromCurrency': fromCurrency,
+      'rate': rate,
+    };
+
+    await expenseRef.set(expense); // Now save with the ID included
+
+    Navigator.pop(context);
+
     // if (!splitEqually) {
     //   double manualTotal = 0;
     //   for (String userId in selectedUsers) {
@@ -189,24 +212,24 @@ class _AddExpensePageState extends State<AddExpensePage> {
     //   }
     // }
 
-    final expense = {
-      'title': title.trim(),
-      'amount': convertedTotal,
-      'amount_ori': totalAmount,
-      'paidBy': paidBy,
-      'splitAmong': selectedUsers,
-      'splitEqually': splitEqually,
-      'manualAmounts': splitEqually ? null : convertedManualAmounts,
-      'manualAmounts_ori': splitEqually ? null : manualAmounts,
-      'timestamp': ServerValue.timestamp,
-      'category': selectedCategory == 'Others' ? otherCategory.trim() : selectedCategory,
-      'fromCurrency': fromCurrency,
-      'rate': rate,
-    };
-
-    await _database.ref('Groups/${widget.groupId}/expenses').push().set(expense);
-
-    Navigator.pop(context);
+    // final expense = {
+    //   'title': title.trim(),
+    //   'amount': convertedTotal,
+    //   'amount_ori': totalAmount,
+    //   'paidBy': paidBy,
+    //   'splitAmong': selectedUsers,
+    //   'splitEqually': splitEqually,
+    //   'manualAmounts': splitEqually ? null : convertedManualAmounts,
+    //   'manualAmounts_ori': splitEqually ? null : manualAmounts,
+    //   'timestamp': ServerValue.timestamp,
+    //   'category': selectedCategory == 'Others' ? otherCategory.trim() : selectedCategory,
+    //   'fromCurrency': fromCurrency,
+    //   'rate': rate,
+    // };
+    //
+    // await _database.ref('Groups/${widget.groupId}/expenses').push().set(expense);
+    //
+    // Navigator.pop(context);
   }
 
   @override
