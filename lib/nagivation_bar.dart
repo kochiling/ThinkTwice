@@ -7,19 +7,26 @@ import 'package:thinktwice/profile_page.dart';
 import 'package:thinktwice/group_page.dart';
 
 class CurveBar extends StatefulWidget {
-  const CurveBar({super.key});
+  final int selectedIndex;
+  const CurveBar({Key? key, this.selectedIndex = 0}) : super(key: key);
 
   @override
   State<CurveBar> createState() => _CurveBarState();
 }
 
 class _CurveBarState extends State<CurveBar> {
-  int index = 0;
+  late int index;
   final screen = const [
     HomePage(),
     GroupPage(),
     ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    index = widget.selectedIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
