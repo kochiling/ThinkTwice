@@ -85,6 +85,7 @@ class _HomePageState extends State<HomePage> {
               final currentUserId1 = currentUserId; // Replace with your logic
               final isLiked = likes.containsKey(currentUserId1);
               final likeCount = likes.length;
+              final postuserId = post['userId'];
 
               return GestureDetector(
                 onTap: () {
@@ -93,6 +94,7 @@ class _HomePageState extends State<HomePage> {
                     MaterialPageRoute(
                       builder: (_) => PostDetailPage2(
                         postId: postId,
+                        postuserId: postuserId,
                         username: username,
                         userProfile: userProfile,
                         images: images,

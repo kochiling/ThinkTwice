@@ -1,7 +1,9 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:thinktwice/add_expenses_page.dart';
+import 'package:thinktwice/category_chart.dart';
 import 'package:thinktwice/expenses_details_page.dart';
 import 'package:thinktwice/group_drawer.dart';
 import 'package:excel/excel.dart';
@@ -84,6 +86,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
 
     return suggestions;
   }
+  Map<String, double> spentPerPerson = {};
+  String? _selectedUserId;
+  Map<String, String> memberImages = {};
+  List<MapEntry<String, double>> topSpenders = [];
+
 
   String groupCode = '';
   String startDate = '';
@@ -117,6 +124,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     _tabController = TabController(length: 2, vsync: this);
     _fetchGroupInfo();
     _fetchBalancesExpensesAndSettlements();
+    _calculateSpentPerPerson();
+
   }
 
   Future<void> _fetchGroupInfo() async {
@@ -136,6 +145,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         await _database.ref('Users/$userId/username').get();
         final username = usernameSnap.value?.toString() ?? userId;
         memberNames[userId] = username;
+        final userProfileSnap =
+        await _database.ref('Users/$userId/profile_pic').get();
+        final userProfile = userProfileSnap.value?.toString() ?? userId;
+        memberImages[userId] = userProfile;
       }
       setState(() {
         groupName = groupSnap.child('groupName').value?.toString() ?? 'Group';
@@ -157,6 +170,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         for (var userId in memberNames.keys) userId: 0.0,
       };
 
+
       if (expensesData != null) {
         expensesData.forEach((key, value) {
           final expense = Map<String, dynamic>.from(value);
@@ -165,6 +179,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
           final double amount =
               double.tryParse(expense['amount'].toString()) ?? 0.0;
           final String paidBy = expense['paidBy'] ?? '';
+
           final List<dynamic> splitAmong =
               expense['splitAmong']?.cast<String>() ?? [];
           final bool splitEqually = expense['splitEqually'] ?? true;
@@ -212,6 +227,54 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
       });
     });
   }
+
+  void _calculateSpentPerPerson() {
+    final expensesRef = _database.ref('Groups/${widget.groupId}/expenses');
+    expensesRef.onValue.listen((event) {
+      final expensesData = event.snapshot.value as Map<dynamic, dynamic>?;
+
+      Map<String, double> tempSpentPerPerson = {
+        for (var userId in memberNames.keys) userId: 0.0,
+      };
+
+      List<Map<String, dynamic>> tempExpenses = [];
+
+      if (expensesData != null) {
+        expensesData.forEach((key, value) {
+          final expense = Map<String, dynamic>.from(value);
+          tempExpenses.add(expense);
+
+          final double amount = double.tryParse(expense['amount'].toString()) ?? 0.0;
+          final List<dynamic> splitAmong = expense['splitAmong']?.cast<String>() ?? [];
+          final bool splitEqually = expense['splitEqually'] ?? true;
+
+          if (splitEqually) {
+            final int splitCount = splitAmong.length;
+            if (splitCount > 0) {
+              final double perPersonAmount = amount / splitCount;
+              for (final userId in splitAmong) {
+                tempSpentPerPerson[userId] = (tempSpentPerPerson[userId] ?? 0.0) + perPersonAmount;
+              }
+            }
+          } else {
+            final manualAmounts = expense['manualAmounts'] as Map<dynamic, dynamic>? ?? {};
+            manualAmounts.forEach((userId, value) {
+              final double manualAmount = double.tryParse(value.toString()) ?? 0.0;
+              tempSpentPerPerson[userId] = (tempSpentPerPerson[userId] ?? 0.0) + manualAmount;
+            });
+          }
+        });
+      }
+
+      setState(() {
+        spentPerPerson = tempSpentPerPerson;
+        expenseHistory = tempExpenses.reversed.toList();
+
+
+      });
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -487,6 +550,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
   }
 
   Widget _buildOverviewTab() {
+    List<MapEntry<String, double>> topSpenders = spentPerPerson.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     Map<String, Map<String, double>> debtMap = {};
     Map<String, String> currencyMap = {};
 
@@ -690,6 +755,132 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               label: const Text("Export Expenses to Excel"),
               onPressed: () => _confirmAndExportExcel(context),
             ),
+            const SizedBox(height: 20),
+            if (spentPerPerson.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Total Spending (Pie Chart):",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF9D4EDD)),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 200,
+                    child: PieChart(
+                      PieChartData(
+                        sections: spentPerPerson.entries.map((entry) {
+                          final userName = memberNames[entry.key] ?? 'Unknown';
+                          final value = entry.value;
+                          final total = spentPerPerson.values.fold(0.0, (a, b) => a + b);
+                          final percentage = total > 0 ? (value / total) * 100 : 0;
+                          final isSelected = _selectedUserId == entry.key;
+
+                          return PieChartSectionData(
+                            title: '$userName\n${percentage.toStringAsFixed(1)}%',
+                            value: value,
+                            color: _getColorForUser(entry.key),
+                            radius: isSelected ? 70 : 60, // Enlarge selected
+                            titleStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          );
+                        }).toList(),
+                        pieTouchData: PieTouchData(
+                          touchCallback: (event, response) {
+                            if (event.isInterestedForInteractions &&
+                                response != null &&
+                                response.touchedSection != null) {
+                              final touchedIndex = response.touchedSection!.touchedSectionIndex;
+                              final touchedEntry = spentPerPerson.entries.elementAt(touchedIndex);
+                              setState(() {
+                                _selectedUserId = touchedEntry.key;
+                              });
+                            } else {
+                              setState(() {
+                                _selectedUserId = null;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_selectedUserId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        '${memberNames[_selectedUserId!] ?? "Unknown"} spent: ${widget.homeCurrency} ${spentPerPerson[_selectedUserId!]!.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+
+                  topSpenders.isNotEmpty
+                      ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        "Top Spenders (Podium):",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF9D4EDD),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (topSpenders.length < 2)
+                        const Text(
+                          "Not enough data to display full podium.",
+                          style: TextStyle(fontSize: 16, color: Colors.black54),
+                        ),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (topSpenders.length > 1)
+                            _buildPodiumPlace(
+                              place: 2,
+                              userId: topSpenders[1].key,
+                              amount: topSpenders[1].value,
+                              height: 120,
+                              color: Colors.grey,
+                            ),
+                          _buildPodiumPlace(
+                            place: 1,
+                            userId: topSpenders[0].key,
+                            amount: topSpenders[0].value,
+                            height: 160,
+                            color: Colors.amber,
+                          ),
+                          if (topSpenders.length > 2)
+                            _buildPodiumPlace(
+                              place: 3,
+                              userId: topSpenders[2].key,
+                              amount: topSpenders[2].value,
+                              height: 100,
+                              color: Colors.brown,
+                            ),
+                        ],
+                      ),
+                    ],
+                  )
+                      : const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.0),
+                    child: Text(
+                      "No spending data available for podium display.",
+                      style: TextStyle(fontSize: 16, color: Colors.black54),
+                    ),
+                  ),
+
+                  CategorySpendingChart(groupId: widget.groupId)
+                ],
+              ),
             ElevatedButton.icon(
               icon: const Icon(Icons.download),
               label: const Text("Export Expenses to PDF"),
@@ -1121,4 +1312,89 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     );
   }
 
+  Color _getColorForUser(String userId) {
+    final colors = [
+      Colors.blueAccent,
+      Colors.redAccent,
+      Colors.green,
+      Colors.purple,
+      Colors.orange,
+      Colors.teal,
+      Colors.pink,
+      Colors.brown,
+    ];
+    return colors[memberNames.keys.toList().indexOf(userId) % colors.length];
+  }
+
+  Widget _buildPodiumPlace({
+    required int place,
+    required String userId,
+    required double amount,
+    required double height,
+    required Color color,
+  }) {
+    final name = memberNames[userId] ?? "Unknown";
+    final imageUrl = memberImages[userId];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Crown above all if 1st place
+        if (place == 1)
+          const Icon(
+            Icons.emoji_events,
+            color: Colors.amber,
+            size: 30,
+          ),
+        const SizedBox(height: 4),
+
+        // Profile image
+        if (imageUrl != null)
+          CircleAvatar(
+            backgroundImage: NetworkImage(imageUrl),
+            radius: 24,
+          ),
+        const SizedBox(height: 6),
+
+        // Place number
+        Text(
+          "#$place",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const SizedBox(height: 6),
+
+        // Bar with name
+        Container(
+          width: 60,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(4),
+          child: RotatedBox(
+            quarterTurns: -1,
+            child: Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        // Spending amount
+        Text(
+          "${widget.homeCurrency} ${amount.toStringAsFixed(2)}",
+          style: const TextStyle(fontSize: 14),
+        ),
+      ],
+    );
+  }
 }

@@ -54,6 +54,8 @@ dependencies:
   open_file: ^3.5.10
   pdf: ^3.10.4
   printing: ^5.10.4
+  fl_chart: ^0.66.2
+  syncfusion_flutter_charts: ^29.2.10
 
 
 dev_dependencies:
