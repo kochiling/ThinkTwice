@@ -72,17 +72,18 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
         },
       ),
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const GeminiPage()),
-          );
-        },
-        child: const Icon(Icons.chat),
-        backgroundColor: Colors.blue,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 60.0),
+        child: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GeminiPage()),
+            );
+          },
+          child: const Icon(Icons.chat),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 

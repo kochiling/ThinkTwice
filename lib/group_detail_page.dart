@@ -10,6 +10,11 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -34,6 +39,51 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
   Map<String, String> memberNames = {}; // userId -> username
   Map<String, double> balances = {}; // userId -> balance
   List<Map<String, dynamic>> expenseHistory = [];
+  List<Map<String, dynamic>> settlementHistory = [];
+
+  List<String> _generateSettlementSuggestions(
+      Map<String, Map<String, double>> debtMap,
+      Map<String, String> memberNames,
+      String currency,
+      ) {
+    Map<String, double> netBalance = {};
+
+    debtMap.forEach((debtor, creditors) {
+      creditors.forEach((creditor, amount) {
+        netBalance[debtor] = (netBalance[debtor] ?? 0) - amount;
+        netBalance[creditor] = (netBalance[creditor] ?? 0) + amount;
+      });
+    });
+
+    final debtors = <String>[];
+    final creditors = <String>[];
+
+    netBalance.forEach((user, balance) {
+      if (balance < -0.01) debtors.add(user);
+      if (balance > 0.01) creditors.add(user);
+    });
+
+    List<String> suggestions = [];
+
+    int i = 0, j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      final d = debtors[i];
+      final c = creditors[j];
+      final dAmt = -netBalance[d]!;
+      final cAmt = netBalance[c]!;
+
+      final pay = dAmt < cAmt ? dAmt : cAmt;
+      suggestions.add("${memberNames[d] ?? d} pays ${memberNames[c] ?? c} $currency ${pay.toStringAsFixed(2)}");
+
+      netBalance[d] = netBalance[d]! + pay;
+      netBalance[c] = netBalance[c]! - pay;
+
+      if (netBalance[d]!.abs() < 0.01) i++;
+      if (netBalance[c]!.abs() < 0.01) j++;
+    }
+
+    return suggestions;
+  }
 
   String groupCode = '';
   String startDate = '';
@@ -66,7 +116,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _fetchGroupInfo();
-    _fetchBalancesAndExpenses();
+    _fetchBalancesExpensesAndSettlements();
   }
 
   Future<void> _fetchGroupInfo() async {
@@ -96,15 +146,16 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     }
   }
 
-  void _fetchBalancesAndExpenses() {
+  void _fetchBalancesExpensesAndSettlements() async {
     final expensesRef = _database.ref('Groups/${widget.groupId}/expenses');
-    expensesRef.onValue.listen((event) {
-      final expensesData = event.snapshot.value as Map<dynamic, dynamic>?;
+    final settlementRef = _database.ref('Groups/${widget.groupId}/settlement');
 
+    expensesRef.onValue.listen((event) async {
+      final expensesData = event.snapshot.value as Map<dynamic, dynamic>?;
+      List<Map<String, dynamic>> tempExpenses = [];
       Map<String, double> tempBalances = {
         for (var userId in memberNames.keys) userId: 0.0,
       };
-      List<Map<String, dynamic>> tempExpenses = [];
 
       if (expensesData != null) {
         expensesData.forEach((key, value) {
@@ -135,9 +186,29 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         });
       }
 
+      // Fetch settlements and update balances
+      final settlementSnap = await settlementRef.get();
+      List<Map<String, dynamic>> tempSettlements = [];
+      if (settlementSnap.exists) {
+        final settlementsData = settlementSnap.value as Map<dynamic, dynamic>?;
+        if (settlementsData != null) {
+          settlementsData.forEach((key, value) {
+            final settlement = Map<String, dynamic>.from(value);
+            tempSettlements.add(settlement);
+            final double amount = double.tryParse(settlement['amount'].toString()) ?? 0.0;
+            final String payer = settlement['payer'] ?? '';
+            final String payee = settlement['payee'] ?? '';
+            // payer pays payee, so payer's balance increases, payee's decreases
+            tempBalances[payer] = (tempBalances[payer] ?? 0.0) + amount;
+            tempBalances[payee] = (tempBalances[payee] ?? 0.0) - amount;
+          });
+        }
+      }
+
       setState(() {
         balances = tempBalances;
         expenseHistory = tempExpenses.reversed.toList();
+        settlementHistory = tempSettlements;
       });
     });
   }
@@ -145,15 +216,15 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDE2E4),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(groupName),
-        backgroundColor: const Color(0xFFCDB4DB),
+        backgroundColor: const Color(0xfffbe5ec),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: Color(0xFFc96077),
+          unselectedLabelColor: Color(0xFFc96077).withOpacity(0.5),
+          indicatorColor: Color(0xFFc96077),
           tabs: const [
             Tab(text: "Overview"),
             Tab(text: "Expenses"),
@@ -178,7 +249,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFEC98E1),
+        backgroundColor: const Color(0xfffbe5ec),
         onPressed: () {
           Navigator.push(
             context,
@@ -196,7 +267,377 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     );
   }
 
+  Future<void> _confirmAndExportPDF(BuildContext context) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) {
+          List<pw.Widget> content = [];
+
+          // ===== GROUP NAME ON TOP =====
+          content.add(
+            pw.Center(
+              child: pw.Text(
+                groupName,
+                style: pw.TextStyle(
+                  fontSize: 16, // slightly larger for group title
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+          );
+
+          content.add(pw.SizedBox(height: 10));
+
+          // ===== EXPENSES SECTION =====
+          content.add(pw.Text("Expenses", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)));
+          content.add(
+            pw.Table.fromTextArray(
+              cellStyle: pw.TextStyle(fontSize: 9),
+              headerStyle: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              headers: ["Date", "Time", "Title", "Amount", "Currency", "Paid By", "Split Among", "Split", "Category"],
+              data: expenseHistory.map((expense) {
+                DateTime dateTime;
+                var rawTimestamp = expense['timestamp'];
+
+                if (rawTimestamp is int) {
+                  dateTime = rawTimestamp < 10000000000
+                      ? DateTime.fromMillisecondsSinceEpoch(rawTimestamp * 1000)
+                      : DateTime.fromMillisecondsSinceEpoch(rawTimestamp);
+                } else if (rawTimestamp is String) {
+                  dateTime = DateTime.tryParse(rawTimestamp) ?? DateTime.now();
+                } else {
+                  dateTime = DateTime.now();
+                }
+
+                String date = DateFormat('yyyy-MM-dd').format(dateTime);
+                String time = DateFormat('HH:mm').format(dateTime);
+                final amount = expense['amount_ori'] ?? 0.0;
+                final fromCurrency = expense['fromCurrency'] ?? '';
+                final paidById = expense['paidBy'] ?? '';
+                final paidBy = memberNames[paidById] ?? paidById;
+                final category = expense['category'] ?? '';
+                final splitEqually = expense['splitEqually'] ?? true;
+
+                String splitAmong = '';
+                if (splitEqually) {
+                  final List<dynamic> splitList = expense['splitAmong'] ?? [];
+                  splitAmong = splitList.map((id) => memberNames[id] ?? id).join(', ');
+                } else {
+                  final manualAmounts = Map<String, dynamic>.from(expense['manualAmounts'] ?? {});
+                  splitAmong = manualAmounts.entries.map((e) {
+                    final name = memberNames[e.key] ?? e.key;
+                    return "$name ($fromCurrency ${e.value})";
+                  }).join(', ');
+                }
+
+                return [
+                  date,
+                  time,
+                  expense['title'] ?? '',
+                  amount.toString(),
+                  fromCurrency,
+                  paidBy,
+                  splitAmong,
+                  splitEqually ? "Equally" : "Manually",
+                  category
+                ];
+              }).toList(),
+            ),
+          );
+
+          // ===== OWED SUMMARY SECTION =====
+          content.add(pw.SizedBox(height: 20));
+          content.add(pw.Text("Owed Summary", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)));
+
+          List<List<pw.Widget>> owedData = [];
+          Map<String, Map<String, double>> debtMap = {};
+          Map<String, String> currencyMap = {};
+
+          for (var expense in expenseHistory) {
+            final fromCurrency = expense['fromCurrency'] ?? '';
+            final splitEqually = expense['splitEqually'] ?? true;
+            final paidBy = expense['paidBy'] ?? '';
+            final amount = (expense['amount'] ?? 0.0).toDouble();
+
+            if (splitEqually) {
+              final List<dynamic> splitList = expense['splitAmong'] ?? [];
+              final perPerson = amount / splitList.length;
+
+              for (var userId in splitList) {
+                if (userId == paidBy) continue;
+                debtMap.putIfAbsent(userId, () => {});
+                debtMap[userId]![paidBy] = (debtMap[userId]![paidBy] ?? 0) + perPerson;
+                currencyMap["${userId}_$paidBy"] = widget.homeCurrency;
+              }
+            } else {
+              final manualAmounts = Map<String, dynamic>.from(expense['manualAmounts'] ?? {});
+              manualAmounts.forEach((userId, amt) {
+                if (userId == paidBy) return;
+                debtMap.putIfAbsent(userId, () => {});
+                final value = (amt is num)
+                    ? amt.toDouble()
+                    : double.tryParse(amt.toString()) ?? 0.0;
+                debtMap[userId]![paidBy] = (debtMap[userId]![paidBy] ?? 0) + value;
+                currencyMap["${userId}_$paidBy"] = widget.homeCurrency;
+              });
+            }
+          }
+
+          // Prepare owed summary with status (all possible pairs)
+          Set<String> allDebtors = {};
+          Set<String> allCreditors = {};
+          debtMap.forEach((debtor, creditors) {
+            allDebtors.add(debtor);
+            allCreditors.addAll(creditors.keys);
+          });
+          // Add all settlements as well
+          for (var settlement in settlementHistory) {
+            allDebtors.add(settlement['payer']);
+            allCreditors.add(settlement['payee']);
+          }
+
+          for (var debtorId in allDebtors) {
+            for (var creditorId in allCreditors) {
+              if (debtorId == creditorId) continue;
+              final debtorName = memberNames[debtorId] ?? debtorId;
+              final creditorName = memberNames[creditorId] ?? creditorId;
+              final currency = currencyMap["${debtorId}_$creditorId"] ?? widget.homeCurrency;
+              double amt = debtMap[debtorId]?[creditorId] ?? 0.0;
+              // Check if there is a settlement for this pair
+              bool isSettled = false;
+              for (var settlement in settlementHistory) {
+                if (settlement['payer'] == debtorId && settlement['payee'] == creditorId) {
+                  double settleAmt = double.tryParse(settlement['amount'].toString()) ?? 0.0;
+                  if ((amt - settleAmt).abs() < 0.01 || amt == 0.0) {
+                    isSettled = true;
+                    break;
+                  }
+                }
+              }
+              String statusText = isSettled ? "Done" : "Unsettled";
+              final statusWidget = pw.Text(
+                statusText,
+                style: pw.TextStyle(
+                  color: isSettled ? PdfColor.fromInt(0xFF4CAF50) : PdfColor.fromInt(0xFFF44336),
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              );
+              if (amt > 0.01 || isSettled) {
+                owedData.add([
+                  pw.Text(debtorName),
+                  pw.Text(creditorName),
+                  pw.Text(amt.toStringAsFixed(2)),
+                  pw.Text(currency),
+                  statusWidget,
+                ]);
+              }
+            }
+          }
+
+          content.add(
+            pw.Table(
+              border: pw.TableBorder.all(),
+              children: [
+                pw.TableRow(
+                  children: [
+                    pw.Text("Debtor", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Creditor", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Amount", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Currency", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Status", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+                ...owedData.map((row) => pw.TableRow(children: row)),
+              ],
+            ),
+          );
+
+          return content;
+        },
+      ),
+    );
+
+    final output = await getExternalStorageDirectory();
+    final file = File("${output!.path}/${groupName}_Expenses.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Export Complete"),
+        content: Text("PDF file saved to:\n${file.path}"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text("Close"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              OpenFile.open(file.path);
+            },
+            child: Text("Open File"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOverviewTab() {
+    Map<String, Map<String, double>> debtMap = {};
+    Map<String, String> currencyMap = {};
+
+    List<Map<String, dynamic>> nonSettlementExpenses =
+        expenseHistory.where((e) => e['settlement'] != true).toList();
+
+    for (var expense in nonSettlementExpenses) {
+      final fromCurrency = expense['fromCurrency'] ?? '';
+      final splitEqually = expense['splitEqually'] ?? true;
+      final paidBy = expense['paidBy'] ?? '';
+      final amount = (expense['amount'] ?? 0.0).toDouble();
+
+      if (splitEqually) {
+        final List<dynamic> splitList = expense['splitAmong'] ?? [];
+        final perPerson = amount / splitList.length;
+
+        for (var userId in splitList) {
+          if (userId == paidBy) continue;
+          debtMap.putIfAbsent(userId, () => {});
+          debtMap[userId]![paidBy] = (debtMap[userId]![paidBy] ?? 0) + perPerson;
+          currencyMap["${userId}_$paidBy"] = fromCurrency;
+        }
+      } else {
+        final manualAmounts = Map<String, dynamic>.from(expense['manualAmounts'] ?? {});
+        manualAmounts.forEach((userId, amt) {
+          if (userId == paidBy) return;
+          debtMap.putIfAbsent(userId, () => {});
+          final value = (amt is num) ? amt.toDouble() : double.tryParse(amt.toString()) ?? 0.0;
+          debtMap[userId]![paidBy] = (debtMap[userId]![paidBy] ?? 0) + value;
+          currencyMap["${userId}_$paidBy"] = fromCurrency;
+        });
+      }
+    }
+
+    // Remove debts that have been settled
+    for (var settlement in settlementHistory) {
+      final payer = settlement['payer'];
+      final payee = settlement['payee'];
+      final amount = double.tryParse(settlement['amount'].toString()) ?? 0.0;
+      if (debtMap[payer] != null && debtMap[payer]![payee] != null) {
+        debtMap[payer]![payee] = (debtMap[payer]![payee]! - amount).clamp(0, double.infinity);
+        if (debtMap[payer]![payee]! <= 0.01) {
+          debtMap[payer]!.remove(payee);
+        }
+      }
+    }
+
+    Map<String, double> netBalance = {};
+    debtMap.forEach((debtor, creditors) {
+      creditors.forEach((creditor, amount) {
+        netBalance[debtor] = (netBalance[debtor] ?? 0) - amount;
+        netBalance[creditor] = (netBalance[creditor] ?? 0) + amount;
+      });
+    });
+
+    memberNames.forEach((userId, _) {
+      balances[userId] = netBalance[userId] ?? 0.0;
+    });
+
+    List<String> suggestions =
+        _generateSettlementSuggestions(debtMap, memberNames, widget.homeCurrency);
+
+    // Redesigned settlement suggestions as vertical cards, no profile icon
+    List<Widget> suggestionCards = [];
+    for (var s in suggestions) {
+      final match = RegExp(r"(.+?) pays (.+?) ([A-Z]{2,4}) (\d+(\.\d+)?)").firstMatch(s);
+      if (match != null) {
+        final payerName = match.group(1) ?? '';
+        final payeeName = match.group(2) ?? '';
+        final currency = match.group(3) ?? '';
+        final amountStr = match.group(4) ?? '';
+        final amount = double.tryParse(amountStr) ?? 0.0;
+
+        final payerId =
+            memberNames.entries.firstWhere((e) => e.value == payerName).key;
+        final payeeId =
+            memberNames.entries.firstWhere((e) => e.value == payeeName).key;
+
+        suggestionCards.add(
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  // Removed CircleAvatar
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "$payerName → $payeeName",
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "$currency $amountStr",
+                          style: const TextStyle(fontSize: 15, color: Color(0xFFc96077)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      bool confirmed = await showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text("Confirm Settlement"),
+                          content: Text("Are you sure $payerName paid $payeeName $currency $amountStr?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text("OK"),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (!confirmed) return;
+                      final newSettlement = {
+                        'payer': payerId,
+                        'payee': payeeId,
+                        'amount': amount,
+                        'currency': currency,
+                        'timestamp': DateTime.now().millisecondsSinceEpoch,
+                      };
+                      final groupRef = FirebaseDatabase.instance
+                          .ref('Groups/${widget.groupId}');
+                      await groupRef.child('settlement').push().set(newSettlement);
+                      await _fetchExpensesAndSetState();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Settlement recorded successfully"),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+                    child: const Text("Done"),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -205,7 +646,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
           children: [
             const Text(
               "Balances:",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF9D4EDD)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF9D4EDD),
+              ),
             ),
             const SizedBox(height: 8),
             ...memberNames.entries.map((entry) {
@@ -214,7 +659,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               final balance = balances[userId] ?? 0.0;
               final formattedBalance =
                   "${balance < 0 ? '-' : ''}${widget.homeCurrency} ${balance.abs().toStringAsFixed(2)}";
-      
+
               return ListTile(
                 title: Text(name),
                 trailing: Text(
@@ -226,10 +671,29 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
                 ),
               );
             }).toList(),
+            const SizedBox(height: 16),
+            if (suggestionCards.isNotEmpty) ...[
+              const Text(
+                "Settle Up Suggestions:",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF9D4EDD), // Match Balances title color
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...suggestionCards,
+            ],
+            const SizedBox(height: 16),
             ElevatedButton.icon(
               icon: const Icon(Icons.download),
               label: const Text("Export Expenses to Excel"),
               onPressed: () => _confirmAndExportExcel(context),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.download),
+              label: const Text("Export Expenses to PDF"),
+              onPressed: () => _confirmAndExportPDF(context),
             ),
           ],
         ),
@@ -579,6 +1043,50 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     }
   }
 
+  Future<void> _fetchExpensesAndSetState() async {
+    try {
+      final snapshot = await FirebaseDatabase.instance
+          .ref('Groups/${widget.groupId}/expenses')
+          .get();
+      final settlementSnap = await FirebaseDatabase.instance
+          .ref('Groups/${widget.groupId}/settlement')
+          .get();
+
+      List<Map<String, dynamic>> updatedExpenses = [];
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          if (value is Map<dynamic, dynamic>) {
+            updatedExpenses.add(Map<String, dynamic>.from(value));
+          }
+        });
+        updatedExpenses.sort((a, b) {
+          final aTimestamp = a['timestamp'] ?? 0;
+          final bTimestamp = b['timestamp'] ?? 0;
+          return aTimestamp.compareTo(bTimestamp);
+        });
+      }
+      List<Map<String, dynamic>> updatedSettlements = [];
+      if (settlementSnap.exists) {
+        final data = settlementSnap.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          if (value is Map<dynamic, dynamic>) {
+            updatedSettlements.add(Map<String, dynamic>.from(value));
+          }
+        });
+      }
+      setState(() {
+        expenseHistory = updatedExpenses;
+        settlementHistory = updatedSettlements;
+      });
+    } catch (e) {
+      print("Error fetching expenses/settlements: $e");
+      setState(() {
+        expenseHistory = [];
+        settlementHistory = [];
+      });
+    }
+  }
 
   void _handleChangeGroupName() {
     TextEditingController _nameController = TextEditingController(text: groupName);

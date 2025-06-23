@@ -5,6 +5,8 @@ import 'package:thinktwice/home_page.dart';
 import 'package:thinktwice/insert_page.dart';
 import 'package:thinktwice/profile_page.dart';
 import 'package:thinktwice/group_page.dart';
+import 'package:thinktwice/travel_tips.dart';
+
 
 class CurveBar extends StatefulWidget {
   const CurveBar({super.key});
@@ -18,6 +20,7 @@ class _CurveBarState extends State<CurveBar> {
   final screen = const [
     HomePage(),
     GroupPage(),
+    TravelTipsPage(),
     ProfilePage(),
   ];
 
@@ -26,8 +29,10 @@ class _CurveBarState extends State<CurveBar> {
     final items = [
       const Icon(Icons.home, size: 30),
       const Icon(Icons.monetization_on_outlined, size: 30),
+      const Icon(Icons.tips_and_updates_outlined, size: 30),
       const Icon(Icons.person, size: 30),
     ];
+
     return Scaffold(
       //backgroundColor: Colors.transparent,
       extendBody: true,
