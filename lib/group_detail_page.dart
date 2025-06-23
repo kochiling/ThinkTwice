@@ -755,6 +755,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               label: const Text("Export Expenses to Excel"),
               onPressed: () => _confirmAndExportExcel(context),
             ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.download),
+              label: const Text("Export Expenses to PDF"),
+              onPressed: () => _confirmAndExportPDF(context),
+            ),
             const SizedBox(height: 20),
             if (spentPerPerson.isNotEmpty)
               Column(
@@ -881,11 +886,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
                   CategorySpendingChart(groupId: widget.groupId)
                 ],
               ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.download),
-              label: const Text("Export Expenses to PDF"),
-              onPressed: () => _confirmAndExportPDF(context),
-            ),
           ],
         ),
       ),

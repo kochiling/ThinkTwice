@@ -19,113 +19,171 @@ class _GeminiPageState extends State<GeminiPage> {
   DateTime? _startDate;
   DateTime? _endDate;
   String? _geminiOutput;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gemini Trip Planner'),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: Color(0xFFF6B1C3),
+        centerTitle: true,
+        elevation: 0,
       ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.blueAccent, Colors.lightBlueAccent],
+            colors: [Color(0xFFFDE2E4), Color(0xFFB47EB3)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 20),
-              _buildCard(
-                child: TextField(
-                  controller: _destinationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Destination',
-                    prefixIcon: Icon(Icons.location_on),
-                    border: InputBorder.none,
-                  ),
+              // Input fields in a card (now at the top)
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 500),
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.symmetric(horizontal: 0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: TextField(
-                  controller: _peopleController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Number of People',
-                    prefixIcon: Icon(Icons.group),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: ListTile(
-                  title: Text(
-                    _startDate == null
-                        ? 'Select Start Date'
-                        : DateFormat('dd MMM yyyy').format(_startDate!),
-                  ),
-                  leading: const Icon(Icons.calendar_today),
-                  onTap: () => _pickDate(isStartDate: true),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildCard(
-                child: ListTile(
-                  title: Text(
-                    _endDate == null
-                        ? 'Select End Date'
-                        : DateFormat('dd MMM yyyy').format(_endDate!),
-                  ),
-                  leading: const Icon(Icons.calendar_today),
-                  onTap: () => _pickDate(isStartDate: false),
-                ),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton.icon(
-                onPressed: _submitTrip,
-                icon: const Icon(Icons.flight_takeoff),
-                label: const Text('Plan My Trip'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurpleAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  textStyle: const TextStyle(fontSize: 18),
-                ),
-              ),
-              const SizedBox(height: 30),
-              if (_geminiOutput != null)
-                Column(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildCard(
-                      child: Text(
-                        _geminiOutput!,
-                        style: const TextStyle(fontSize: 16),
+                      child: TextField(
+                        controller: _destinationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Destination',
+                          prefixIcon: Icon(Icons.location_on, color: Color(0xFFB47EB3)),
+                          border: InputBorder.none,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    _buildCard(
+                      child: TextField(
+                        controller: _peopleController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Number of People',
+                          prefixIcon: Icon(Icons.group, color: Color(0xFFB47EB3)),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildCard(
+                      child: ListTile(
+                        title: Text(
+                          _startDate == null
+                              ? 'Select Start Date'
+                              : DateFormat('dd MMM yyyy').format(_startDate!),
+                          style: const TextStyle(color: Color(0xFFB47EB3)),
+                        ),
+                        leading: const Icon(Icons.calendar_today, color: Color(0xFFB47EB3)),
+                        onTap: () => _pickDate(isStartDate: true),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCard(
+                      child: ListTile(
+                        title: Text(
+                          _endDate == null
+                              ? 'Select End Date'
+                              : DateFormat('dd MMM yyyy').format(_endDate!),
+                          style: const TextStyle(color: Color(0xFFB47EB3)),
+                        ),
+                        leading: const Icon(Icons.calendar_today, color: Color(0xFFB47EB3)),
+                        onTap: () => _pickDate(isStartDate: false),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: _showSaveDialog,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Save Trip'),
+                      onPressed: _isLoading ? null : _submitTrip,
+                      icon: const Icon(Icons.flight_takeoff, color: Color(0xFFB47EB3)),
+                      label: const Text('Plan My Trip'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Color(0xFFF6B1C3),
+                        foregroundColor: Color(0xFFB47EB3),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
-                        textStyle: const TextStyle(fontSize: 16),
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        elevation: 2,
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              if (_isLoading)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Column(
+                    children: const [
+                      CircularProgressIndicator(color: Color(0xFFB47EB3)),
+                      SizedBox(height: 16),
+                      Text('Generating your trip plan...', style: TextStyle(color: Color(0xFFB47EB3), fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              if (!_isLoading && _geminiOutput != null)
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.98),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 18,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _geminiOutput!,
+                        style: const TextStyle(fontSize: 16, color: Color(0xFFB47EB3)),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: _showSaveDialog,
+                        icon: const Icon(Icons.save, color: Colors.white),
+                        label: const Text('Save Trip'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFFB47EB3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          elevation: 2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -185,6 +243,10 @@ class _GeminiPageState extends State<GeminiPage> {
 
   Future<void> _callGeminiAPI(
       String destination, String people, DateTime start, DateTime end) async {
+    setState(() {
+      _isLoading = true;
+      _geminiOutput = null;
+    });
     const apiKey = 'AIzaSyCfY4jm-SgkhGUVzzcoGfawkjYrc0I-D4s'; // Replace with your actual API key
 
     final url =
@@ -210,10 +272,12 @@ Plan a trip to $destination for $people people from ${DateFormat('dd MMM yyyy').
 
       setState(() {
         _geminiOutput = text;
+        _isLoading = false;
       });
     } else {
       setState(() {
-        _geminiOutput = 'Error: ${response.body}';
+        _geminiOutput = 'Error: {response.body}';
+        _isLoading = false;
       });
     }
   }
@@ -260,7 +324,6 @@ Plan a trip to $destination for $people people from ${DateFormat('dd MMM yyyy').
     );
   }
 
-
   void _saveTripToFirebase(String tripName) {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -298,6 +361,4 @@ Plan a trip to $destination for $people people from ${DateFormat('dd MMM yyyy').
       );
     });
   }
-
-
 }

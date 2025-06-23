@@ -112,6 +112,7 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
                     title: title,
                     description: post['description'] ?? '',
                     timestamp: post['timestamp'] ?? DateTime.now().toIso8601String(),
+                    postuserId: post['userId'] ?? '',
                   ),
                 ),
               );

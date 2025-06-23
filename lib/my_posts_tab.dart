@@ -83,6 +83,7 @@ class _MyPostsTabState extends State<MyPostsTab> {
                         title: title,
                         description: post['description'] ?? '',
                         timestamp: post['timestamp'] ?? DateTime.now().toIso8601String(),
+                        postuserId: post['userId'] ?? '',
                       ),
                     ),
                   );
