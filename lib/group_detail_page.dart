@@ -17,6 +17,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:thinktwice/group_chat_page.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -169,6 +170,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
       Map<String, double> tempBalances = {
         for (var userId in memberNames.keys) userId: 0.0,
       };
+      //List<Map<String, dynamic>> tempExpenses = [];
 
 
       if (expensesData != null) {
@@ -283,10 +285,30 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
       appBar: AppBar(
         title: Text(groupName),
         backgroundColor: const Color(0xfffbe5ec),
+        //backgroundColor: const Color(0xFFCDB4DB),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Group Chat',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GroupChatPage(
+                    groupId: widget.groupId,
+                    currentUserId: FirebaseAuth.instance.currentUser!.uid,
+                    currentUsername: memberNames[FirebaseAuth.instance.currentUser!.uid] ?? 'You',
+                    currentUserProfile: memberImages[FirebaseAuth.instance.currentUser!.uid] ?? '',
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Color(0xFFc96077),
-          unselectedLabelColor: Color(0xFFc96077).withOpacity(0.5),
+          unselectedLabelColor: Color(0xFFc96077).withOpacity(0.7),
           indicatorColor: Color(0xFFc96077),
           tabs: const [
             Tab(text: "Overview"),
@@ -325,7 +347,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
             ),
           );
         },
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Color(0xff000000),),
       ),
     );
   }
@@ -626,9 +648,15 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         final amount = double.tryParse(amountStr) ?? 0.0;
 
         final payerId =
-            memberNames.entries.firstWhere((e) => e.value == payerName).key;
+            memberNames.entries.firstWhere(
+              (e) => e.value == payerName,
+              orElse: () => MapEntry(payerName, payerName),
+            ).key;
         final payeeId =
-            memberNames.entries.firstWhere((e) => e.value == payeeName).key;
+            memberNames.entries.firstWhere(
+              (e) => e.value == payeeName,
+              orElse: () => MapEntry(payeeName, payeeName),
+            ).key;
 
         suggestionCards.add(
           Card(
@@ -931,7 +959,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         }
 
         return ListTile(
-          leading: Icon(icon, color: Color(0xFF9D4EDD)),
+          leading: Icon(icon, color: Color(0xFFF184E3)),
           title: Text(title),
           subtitle: Text("Paid by $paidBy\n$splitDescription"),
           isThreeLine: true,
@@ -939,7 +967,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
             formattedAmount,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF9D4EDD),
+              color: Color(0xFFEC98E1),
             ),
           ),
           onTap: () {

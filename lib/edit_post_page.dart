@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -138,10 +138,14 @@ class _EditPostPageState extends State<EditPostPage> {
       await database.child('Posts/${widget.postId}/description').set(_descController.text.trim());
       await database.child('Posts/${widget.postId}/images').set(allImageUrls);
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const CurveBar(selectedIndex: 2)),
-          (route) => false,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully Update')),
         );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const CurveBar(selectedIndex: 3)),
+              (route) => false,
+        );
+        //Navigator.of(context).pop(true); // Pop back to post details page and return true to trigger refresh
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

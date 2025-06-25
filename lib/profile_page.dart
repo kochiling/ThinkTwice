@@ -69,7 +69,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Container(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             decoration: const BoxDecoration(
-              color: Color(0xFFFDE2E4), // Light pink background
+              color: Color(0x50F6DFEC), // Light pink background
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
             child: Row(

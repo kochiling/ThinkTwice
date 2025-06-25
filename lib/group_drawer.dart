@@ -26,22 +26,22 @@ class GroupDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: const Color(0xFFFDE2E4),
+      backgroundColor: const Color(0xFFFFFFFF),
       child: ListView(
         //padding: const EdgeInsets.all(16.0),
         children: [
           const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFFCDB4DB)),
+            decoration: BoxDecoration(color: Color(0xFFF4D0F2)),
             child: Text(
               'Group Info',
-              style: TextStyle(fontSize: 24, color: Colors.white),
+              style: TextStyle(fontSize: 24, color: Colors.black),
             ),
           ),
           ListTile(
             title: const Text("Group Name"),
             subtitle: Text(groupName),
             trailing: IconButton(
-              icon: const Icon(Icons.edit, color: Color(0xFF9D4EDD)),
+              icon: const Icon(Icons.edit, color: Color(0xFFEC98E8)),
               onPressed: onChangeGroupName,
             ),
           ),
@@ -74,7 +74,7 @@ class GroupDrawer extends StatelessWidget {
             title: const Text("Members"),
             subtitle: Text("$memberCount members"),
             trailing: IconButton(
-              icon: const Icon(Icons.person_add, color: Color(0xFF9D4EDD)),
+              icon: const Icon(Icons.person_add, color: Color(0xFFEC98E8)),
               onPressed: onAddMember,
             ),
           ),

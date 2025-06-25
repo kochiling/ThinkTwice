@@ -235,10 +235,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDE2E4),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: const Text("Add Expense"),
-        backgroundColor: const Color(0xFFB388EB),
+        backgroundColor: const Color(0xfffbe5ec),
       ),
       body: memberNames.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -327,7 +327,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                     child: Column(
                       children: [
                         CircleAvatar(
-                          backgroundColor: isSelected ? Color(0xFFB388EB) : Colors.grey[300],
+                          backgroundColor: isSelected ? Color(0xFFEC98E1) : Colors.grey[300],
                           child: Icon(icon, color: Colors.white),
                         ),
                         const SizedBox(height: 4),
@@ -401,8 +401,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 "Split Among:",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFFB388EB),
+                  fontSize: 14,
+                  color: Color(0xFF000000),
                 ),
               ),
               Column(
@@ -412,7 +412,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                     children: [
                       CheckboxListTile(
                         title: Text(entry.value),
-                        activeColor: const Color(0xFFB388EB),
+                        activeColor: const Color(0xFFEC98E8),
                         value: selectedUsers.contains(entry.key),
                         onChanged: (val) {
                           setState(() {
@@ -452,7 +452,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
               Center(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB388EB),
+                    backgroundColor: const Color(0xFFEC98E1),
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
