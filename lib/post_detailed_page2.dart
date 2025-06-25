@@ -384,7 +384,6 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
             final commentId = c['comment_id'];
             final commentTime = DateFormat('dd MMM yyyy, hh:mm a')
                 .format(DateTime.parse(c['timestamp']));
-
             final replies = (c['replies'] as Map?) ?? {}; // handle replies
             final hasReplies = replies.isNotEmpty;
             final isExpanded = _expandedReplies.contains(commentId);
@@ -425,85 +424,98 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                       );
                     }
                   },
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: NetworkImage(c['user_profile'] ?? ''),
-                    ),
-                    title: Text(
-                      c['username'] ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c['content'] ?? '', style: const TextStyle(fontSize: 14)),
-
-                        const SizedBox(height: 2),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: 8), // Indent for better alignment
+                      Container(
+                        margin: const EdgeInsets.only(top: 8, right: 8),
+                        child: CircleAvatar(
+                          backgroundImage: NetworkImage(c['user_profile'] ?? ''),
+                          radius: 16,
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            SizedBox(height: 4),
+                            Text(
+                              c['username'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(c['content'] ?? '', style: const TextStyle(fontSize: 14)),
+
+                            const SizedBox(height: 2),
+
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  commentTime,
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                const SizedBox(width: 12),
-                                GestureDetector(
-                                  onTap: () => _showReplyDialog(c['comment_id'], c['user_id']),
-                                  child: const Text(
-                                    'Reply',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.w500,
+                                Row(
+                                  children: [
+                                    Text(
+                                      commentTime,
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                                     ),
-                                  ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => _showReplyDialog(c['comment_id'], c['user_id']),
+                                      child: const Text(
+                                        'Reply',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blue,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    _likeIcon(c),
+                                    Text(
+                                      '${(c['likes'] as Map?)?.length ?? 0}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            Row(
-                              children: [
-                                _likeIcon(c),
-                                Text(
-                                  '${(c['likes'] as Map?)?.length ?? 0}',
+
+                            // Toggle replies section
+                            if (hasReplies)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size(0, 20),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    if (isExpanded) {
+                                      _expandedReplies.remove(commentId);
+                                    } else {
+                                      _expandedReplies.add(commentId);
+                                    }
+                                  });
+                                },
+                                child: Text(
+                                  isExpanded
+                                      ? 'Hide replies'
+                                      : 'View replies (${replies.length})',
                                   style: const TextStyle(fontSize: 12),
                                 ),
-                              ],
-                            ),
+                              ),
+                              SizedBox(height: 8),
+
+                            // Show replies only if expanded
+                            if (isExpanded) _buildReplies(c),
                           ],
                         ),
-
-                        // Toggle replies section
-                        if (hasReplies)
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size(0, 20),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                if (isExpanded) {
-                                  _expandedReplies.remove(commentId);
-                                } else {
-                                  _expandedReplies.add(commentId);
-                                }
-                              });
-                            },
-                            child: Text(
-                              isExpanded
-                                  ? 'Hide replies'
-                                  : 'View replies (${replies.length})',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-
-                        // Show replies only if expanded
-                        if (isExpanded) _buildReplies(c),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(height: 0),

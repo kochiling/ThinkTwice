@@ -56,7 +56,7 @@ dependencies:
   printing: ^5.10.4
   fl_chart: ^0.66.2
   syncfusion_flutter_charts: ^29.2.10
-
+  flutter_polls: ^0.1.6
 
 dev_dependencies:
   flutter_test:
