@@ -108,7 +108,8 @@ class _PollDetailPageState extends State<PollDetailPage> {
                       children: [
                         Text(
                           'Poll created by ${pollMsg.senderName}',
-                          style: const TextStyle(fontSize: 15, color: Color(0xFFD81B60)),
+                          style: const TextStyle(fontSize: 15, color: Color(
+                              0xFF000000)),
                         ),
                         Text(
                           DateFormat('yyyy-MM-dd HH:mm').format(pollMsg.timestamp),
@@ -223,9 +224,9 @@ class _PollDetailPageState extends State<PollDetailPage> {
                   if (ended)
                     Row(
                       children: const [
-                        Icon(Icons.stop_circle, color: Colors.red),
+                        Icon(Icons.stop_circle, color: Colors.black),
                         SizedBox(width: 8),
-                        Text('Poll Ended', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Poll Ended', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                 ],

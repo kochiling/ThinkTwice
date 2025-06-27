@@ -52,13 +52,13 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
       appBar: AppBar(
         title: const Text(
           'Travel Tips',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          // style: TextStyle(
+          //   fontSize: 22,
+          //   fontWeight: FontWeight.bold,
+          //   color: Colors.white,
+          // ),
         ),
-        backgroundColor: const Color(0xFFF6B1C3), // Light pink
+        //backgroundColor: const Color(0xFFF6B1C3), // Light pink
         elevation: 0,
       ),
       body: _trips.isEmpty

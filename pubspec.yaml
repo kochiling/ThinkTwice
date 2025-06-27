@@ -84,6 +84,7 @@ flutter:
   assets:
      - images/Logo_tt_1.jpg
      - images/Logo_tt_2.jpg
+     - images/profile_pic4.jpg
 
   # An images asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -110,3 +111,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+

@@ -662,6 +662,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
           Card(
             margin: const EdgeInsets.symmetric(vertical: 8),
             elevation: 2,
+            color: Color(0xffffffff),
+            shape: new RoundedRectangleBorder(
+                side: new BorderSide(color: Colors.black12, width: 0.5),
+                borderRadius: BorderRadius.circular(8.0)),
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
@@ -678,12 +682,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
                         const SizedBox(height: 4),
                         Text(
                           "$currency $amountStr",
-                          style: const TextStyle(fontSize: 15, color: Color(0xFFc96077)),
+                          style: const TextStyle(fontSize: 15, color: Color(0xFFc96077),fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xfffbe5ec), // Button background color
+                      foregroundColor: Colors.black87,
+                      //side: BorderSide(color: Color(0x74ec98e1), width: 2), // Border color and width// Text (and icon) color
+                    ),
                     onPressed: () async {
                       bool confirmed = await showDialog(
                         context: context,
@@ -782,6 +791,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               icon: const Icon(Icons.download),
               label: const Text("Export Expenses to Excel"),
               onPressed: () => _confirmAndExportExcel(context),
+              // style: ElevatedButton.styleFrom(
+              //   //backgroundColor: Colors.transparent,
+              //   foregroundColor: Colors.white,
+              //   //shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              // ),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.download),
