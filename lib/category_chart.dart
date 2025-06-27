@@ -82,7 +82,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                 textStyle: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+                  color: Color(0xff000000),
                 ),
               ),
               tooltipBehavior: _tooltip,

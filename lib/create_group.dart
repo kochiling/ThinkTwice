@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:thinktwice/group_page.dart';
+import 'package:thinktwice/nagivation_bar.dart';
 import 'package:thinktwice/user_model.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -89,6 +90,7 @@ class _CreateGroupState extends State<CreateGroup> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xffffffff),
       appBar: AppBar(
         title: const Text("Create Group"),
       ),
@@ -119,6 +121,10 @@ class _CreateGroupState extends State<CreateGroup> {
               const SizedBox(width: 80),
 
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFE991AA),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
                 if (currentStep < 3) {
                   setState(() {
@@ -129,7 +135,7 @@ class _CreateGroupState extends State<CreateGroup> {
                 }
               },
               child: Text(currentStep == 3 ? "Create" : "Next"),
-            ),
+            )
           ],
         ),
       ),
@@ -490,7 +496,11 @@ class _CreateGroupState extends State<CreateGroup> {
               child: const Text("Close"),
               onPressed: () {
                 Navigator.pop(context); // Close the dialog
-                Navigator.pop(context, 1); // Pop current group creation page
+                //Navigator.pop(context, 1); // Pop current group creation page
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const CurveBar(selectedIndex: 1)),
+                      (route) => false,
+                );
                 // OR Navigator.pushReplacement() if going to a new screen:
                 // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GroupPage()));
               },

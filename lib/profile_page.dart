@@ -55,14 +55,14 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        //title: const Text('Profile'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
           ),
         ],
-        backgroundColor: const Color(0xFFF6B1C3), // Soft pink
+        backgroundColor: const Color(0x50F6DFEC), // Soft pink
       ),
       body: Column(
         children: [

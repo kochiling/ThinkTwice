@@ -5,6 +5,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:thinktwice/nagivation_bar.dart';
 import 'edit_post_page.dart';
 
 class PostDetailPage2 extends StatefulWidget {
@@ -36,7 +37,7 @@ class PostDetailPage2 extends StatefulWidget {
 class _PostDetailPage2State extends State<PostDetailPage2> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _commentController = TextEditingController();
-  bool _showBottomBar = true;
+  final bool _showBottomBar = true;
 
   final database = FirebaseDatabase.instance.ref();
   final user = FirebaseAuth.instance.currentUser!;
@@ -57,24 +58,30 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
 
   final Set<String> _expandedReplies = {};
 
+  String? _replyToCommentId;
+  String? _replyToUserId;
+  String? _replyToUsername;
+
+  int _currentImageIndex = 0;
+  late final PageController _imagePageController = PageController();
+
   @override
   void initState() {
     super.initState();
     postId = widget.postId;
+    _imagePageController.addListener(() {
+      final newIndex = _imagePageController.page?.round() ?? 0;
+      if (newIndex != _currentImageIndex) {
+        setState(() {
+          _currentImageIndex = newIndex;
+        });
+      }
+    });
     _loadUserData();
     _listenLikeCount();
     _listenSaveStatus();
     _listenCommentCount();
     _listenSaveCount();
-
-    // _scrollController.addListener(() {
-    //   final direction = _scrollController.position.userScrollDirection;
-    //   if (direction == ScrollDirection.reverse && _showBottomBar) {
-    //     setState(() => _showBottomBar = false);
-    //   } else if (direction == ScrollDirection.forward && !_showBottomBar) {
-    //     setState(() => _showBottomBar = true);
-    //   }
-    // });
 
     _commentFocusNode.addListener(() {
       setState(() {
@@ -141,31 +148,44 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
   void _submitComment() async {
     final content = _commentController.text.trim();
     if (content.isEmpty) return;
-    if (_commentController.text.trim().isEmpty) return;
-
-    final newCommentRef = database.child('Posts/$postId/Comments/${user.uid}').push();
-    await newCommentRef.set({
-      'comment_id': newCommentRef.key,
-      'timestamp': DateTime.now().toString(),
-      'content': content,
-      'username': currentUsername,
-      'user_profile': currentUserProfile,
-      'user_id': user.uid,
-    });
-
+    if (_replyToCommentId != null && _replyToUserId != null) {
+      // Submit as reply
+      final ref = database.child('Posts/$postId/Comments/${_replyToUserId!}/${_replyToCommentId!}/replies').push();
+      await ref.set({
+        'reply_id': ref.key,
+        'timestamp': DateTime.now().toString(),
+        'content': content,
+        'username': currentUsername,
+        'user_profile': currentUserProfile,
+        'user_id': user.uid,
+      });
+    } else {
+      // Submit as new comment
+      final newCommentRef = database.child('Posts/$postId/Comments/${user.uid}').push();
+      await newCommentRef.set({
+        'comment_id': newCommentRef.key,
+        'timestamp': DateTime.now().toString(),
+        'content': content,
+        'username': currentUsername,
+        'user_profile': currentUserProfile,
+        'user_id': user.uid,
+      });
+    }
     _commentController.clear();
-    FocusScope.of(context).unfocus(); // Close keyboard
+    FocusScope.of(context).unfocus();
     setState(() {
-      _isCommentFocused = false; // Return to original UI
+      _isCommentFocused = false;
+      _replyToCommentId = null;
+      _replyToUserId = null;
+      _replyToUsername = null;
     });
-
-    //_commentController.clear();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     _commentController.dispose();
+    _imagePageController.dispose();
     super.dispose();
   }
 
@@ -179,6 +199,7 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
         FocusScope.of(context).unfocus(); // ⬅️ Dismiss keyboard
       },
       child: Scaffold(
+        backgroundColor: Color(0xffffffff),
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
@@ -262,15 +283,22 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                                             try {
                                               await database.child('Posts/${widget.postId}').remove();
                                               if (mounted) {
-                                                Navigator.of(context).pop(); // Go back after delete
                                                 ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('Post deleted')),
+                                                  SnackBar(content: Text('Delete post')),
+                                                );
+                                                await Future.delayed(const Duration(milliseconds: 300));
+                                                Navigator.of(context).pop();
+                                                Navigator.of(context).pushAndRemoveUntil(
+                                                  MaterialPageRoute(builder: (context) => const CurveBar(selectedIndex: 0)),
+                                                      (route) => false,
                                                 );
                                               }
                                             } catch (e) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Failed to delete post: $e')),
-                                              );
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Failed to delete post: $e')),
+                                                );
+                                              }
                                             }
                                           }
                                         },
@@ -299,7 +327,13 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                         SizedBox(
                           height: 450,
                           child: PhotoViewGallery.builder(
+                            pageController: _imagePageController,
                             itemCount: widget.images.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentImageIndex = index;
+                              });
+                            },
                             builder: (context, index) {
                               return PhotoViewGalleryPageOptions(
                                 imageProvider: NetworkImage(widget.images[index]),
@@ -309,9 +343,30 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                             },
                             scrollPhysics: const BouncingScrollPhysics(),
                             backgroundDecoration:
-                            const BoxDecoration(color: Colors.white),
+                              const BoxDecoration(color: Colors.white),
                           ),
                         ),
+                        if (widget.images.length > 1)
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(widget.images.length, (index) {
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentImageIndex == index
+                                        ? const Color(0xFFC96077) // active dot pink
+                                        : const Color(0xFFFBE5EC), // inactive dot light pink
+                                    border: Border.all(color: const Color(0xFFC96077), width: 1),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
 
                         const SizedBox(height: 12),
                         Text(widget.title,
@@ -352,6 +407,7 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
       ),
     );
   }
+
   Widget _buildCommentList() {
     return StreamBuilder<DatabaseEvent>(
       stream: database.child('Posts/$postId/Comments').onValue,
@@ -460,7 +516,14 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                                     ),
                                     const SizedBox(width: 12),
                                     GestureDetector(
-                                      onTap: () => _showReplyDialog(c['comment_id'], c['user_id']),
+                                      onTap: () {
+                                        setState(() {
+                                          _replyToCommentId = commentId;
+                                          _replyToUserId = c['user_id'];
+                                          _replyToUsername = c['username'];
+                                        });
+                                        FocusScope.of(context).requestFocus(_commentFocusNode);
+                                      },
                                       child: const Text(
                                         'Reply',
                                         style: TextStyle(
@@ -528,11 +591,9 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
     );
   }
 
-
-
   Widget _buildOriginalBottomBar() {
     final isCommenting = _commentFocusNode.hasFocus;
-
+    final isReplying = _replyToCommentId != null && _replyToUsername != null;
     return Stack(
       children: [
         AnimatedPositioned(
@@ -549,147 +610,104 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
                 BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, -2)),
               ],
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    focusNode: _commentFocusNode,
-                    decoration: InputDecoration(
-                      hintText: "Write a comment...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                    ),
+                if (isReplying)
+                  Row(
+                    children: [
+                      Icon(Icons.reply, color: Color(0xFFC96077), size: 18),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Replying to @$_replyToUsername',
+                          style: const TextStyle(color: Color(0xFFC96077), fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _replyToCommentId = null;
+                            _replyToUserId = null;
+                            _replyToUsername = null;
+                          });
+                        },
+                        child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                      ),
+                    ],
                   ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        focusNode: _commentFocusNode,
+                        decoration: InputDecoration(
+                          hintText: isReplying ? 'Reply to @$_replyToUsername...' : 'Write a comment...',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ),
+                    if (isCommenting || isReplying)
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        color: _isCommentNotEmpty ? Colors.blue : Colors.grey,
+                        onPressed: _isCommentNotEmpty ? _submitComment : null,
+                      )
+                    else ...[
+                      IconButton(
+                        icon: Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.red : Colors.grey,
+                        ),
+                        onPressed: () {
+                          final ref = database.child('Posts/$postId/Likes/${user.uid}');
+                          isLiked ? ref.remove() : ref.set(true);
+                        },
+                      ),
+                      Text('$likeCount'),
+                      IconButton(
+                        icon: Icon(isSaved ? Icons.star : Icons.star_border,
+                          color: isSaved ? Colors.yellow : Colors.grey,),
+                        onPressed: () async {
+                          final userRef = database.child('Users/${user.uid}/saved_posts/$postId');
+                          final postRef = database.child('Posts/$postId');
+                          if (isSaved) {
+                            await userRef.remove();
+                            await postRef.child('saveCount').runTransaction((value) {
+                              final current = (value ?? 1) as int;
+                              return Transaction.success(current - 1);
+                            });
+                          } else {
+                            await userRef.set(true);
+                            await postRef.child('saveCount').runTransaction((value) {
+                              final current = (value ?? 0) as int;
+                              return Transaction.success(current + 1);
+                            });
+                          }
+                        },
+                      ),
+                      Text('$saveCount'),
+                      IconButton(
+                        icon: const Icon(Icons.comment_outlined),
+                        onPressed: () {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+                      Text('$commentCount'),
+                    ],
+                  ],
                 ),
-
-                if (isCommenting)
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    color: _isCommentNotEmpty ? Colors.blue : Colors.grey,
-                    onPressed: _isCommentNotEmpty ? _submitComment : null,
-                  )
-                else ...[
-                  IconButton(
-                    icon: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey,
-                    ),
-                    onPressed: () {
-                      final ref = database.child('Posts/$postId/Likes/${user.uid}');
-                      isLiked ? ref.remove() : ref.set(true);
-                    },
-                  ),
-                  Text('$likeCount'),
-
-                  IconButton(
-                    icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
-                    onPressed: () async {
-                      final userRef = database.child('Users/${user.uid}/saved_posts/$postId');
-                      final postRef = database.child('Posts/$postId');
-
-                      if (isSaved) {
-                        await userRef.remove();
-                        await postRef.child('saveCount').runTransaction((value) {
-                          final current = (value ?? 1) as int;
-                          return Transaction.success(current - 1);
-                        });
-                      } else {
-                        await userRef.set(true);
-                        await postRef.child('saveCount').runTransaction((value) {
-                          final current = (value ?? 0) as int;
-                          return Transaction.success(current + 1);
-                        });
-                      }
-                    },
-                  ),
-                  Text('$saveCount'),
-
-                  IconButton(
-                    icon: const Icon(Icons.comment_outlined),
-                    onPressed: () {
-                      _scrollController.animateTo(
-                        _scrollController.position.maxScrollExtent,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeInOut,
-                      );
-                      //FocusScope.of(context).requestFocus(_commentFocusNode);
-                    },
-                  ),
-                  Text('$commentCount'),
-                ],
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-
-
-  // Widget _buildCommentBar() {
-  //   return Positioned(
-  //     bottom: 0,
-  //     left: 0,
-  //     right: 0,
-  //     child: Container(
-  //       padding: const EdgeInsets.all(12),
-  //       color: Colors.white,
-  //       child: Row(
-  //         children: [
-  //           Expanded(
-  //             child: TextField(
-  //               controller: _commentController,
-  //               focusNode: _commentFocusNode,
-  //               decoration: InputDecoration(
-  //                 hintText: "Write a comment...",
-  //                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-  //               ),
-  //             ),
-  //           ),
-  //           IconButton(
-  //             icon: const Icon(Icons.send),
-  //             color: _isCommentNotEmpty ? Colors.blue : Colors.grey,
-  //             onPressed: _isCommentNotEmpty ? _submitComment : null,
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
-
-
-  void _showReplyDialog(String parentCommentId, String parentUserId) {
-    final replyController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text("Reply to comment"),
-        content: TextField(controller: replyController, decoration: const InputDecoration(hintText: 'Your reply')),
-        actions: [
-          TextButton(
-            child: Text("Cancel"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            child: Text("Reply"),
-            onPressed: () async {
-              final replyText = replyController.text.trim();
-              if (replyText.isEmpty) return;
-              final ref = database.child('Posts/$postId/Comments/$parentUserId/$parentCommentId/replies').push();
-              await ref.set({
-                'reply_id': ref.key,
-                'timestamp': DateTime.now().toString(),
-                'content': replyText,
-                'username': currentUsername,
-                'user_profile': currentUserProfile,
-                'user_id': user.uid,
-              });
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -699,15 +717,44 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("Edit comment"),
-        content: TextField(controller: editController),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: const [
+            Icon(Icons.edit, color: Color(0xFFC96077)),
+            SizedBox(width: 8),
+            Text("Edit comment", style: TextStyle(color: Color(0xFFC96077), fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: TextField(
+          controller: editController,
+          decoration: InputDecoration(
+            hintText: 'Edit your comment...',
+            filled: true,
+            fillColor: Color(0xFFFFFFFF),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Color(0xFF000000)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Color(0xFF000000), width: 2),
+            ),
+          ),
+          maxLines: 3,
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         actions: [
           TextButton(
-            child: Text("Cancel"),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
             onPressed: () => Navigator.pop(context),
           ),
           ElevatedButton(
-            child: Text("Save"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFDCADD5),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Save"),
             onPressed: () async {
               final updated = editController.text.trim();
               if (updated.isNotEmpty) {
@@ -761,55 +808,6 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
 
   }
 
-  void _showEditPostDialog() {
-    final editTitleController = TextEditingController(text: widget.title);
-    final editDescController = TextEditingController(text: widget.description);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit Post'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: editTitleController,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            TextField(
-              controller: editDescController,
-              decoration: const InputDecoration(labelText: 'Description'),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            child: const Text('Save'),
-            onPressed: () async {
-              final newTitle = editTitleController.text.trim();
-              final newDesc = editDescController.text.trim();
-              if (newTitle.isNotEmpty && newDesc.isNotEmpty) {
-                await database.child('Posts/${widget.postId}/title').set(newTitle);
-                await database.child('Posts/${widget.postId}/description').set(newDesc);
-                if (mounted) {
-                  setState(() {});
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Post updated')),
-                  );
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _likeIcon(Map<String, dynamic> comment) {
     final likes = comment['likes'] as Map? ?? {};
     final hasLiked = likes.containsKey(user.uid);
@@ -842,20 +840,54 @@ class _PostDetailPage2State extends State<PostDetailPage2> {
         replies.sort((a, b) => DateTime.parse(a['timestamp']).compareTo(DateTime.parse(b['timestamp'])));
 
         return Padding(
-          padding: const EdgeInsets.only(left: 2.0), // indent replies
+          padding: const EdgeInsets.only(left: 2.0, right: 2.0), // more indent for replies
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: replies.map((reply) {
               final replyTime = DateFormat('dd MMM yyyy, hh:mm a')
                   .format(DateTime.parse(reply['timestamp']));
-              return ListTile(
-                leading: CircleAvatar(backgroundImage: NetworkImage(reply['user_profile'] ?? '')),
-                title: Text(reply['username'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Column(
+              return Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(reply['content'] ?? ''),
-                    Text(replyTime, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    SizedBox(height: 8),
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, right: 8),
+                      child: CircleAvatar(
+                        backgroundImage: NetworkImage(reply['user_profile'] ?? ''),
+                        radius: 13, // slightly smaller for replies
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 4),
+                          Text(
+                            reply['username'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(reply['content'] ?? '', style: const TextStyle(fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    replyTime,
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              // Optionally, add like button for replies here if needed
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
