@@ -18,13 +18,14 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
   List<Map<String, dynamic>> _filteredTrips = [];
   final TextEditingController _searchController = TextEditingController();
   User? _currentUser;
+  String _searchKeyword = '';
+  bool _showSearch = false;
 
   @override
   void initState() {
     super.initState();
     _currentUser = FirebaseAuth.instance.currentUser;
     _fetchTrips();
-    _searchController.addListener(_filterTrips);
   }
 
   @override
@@ -72,27 +73,28 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
   }
 
   void _filterTrips() {
-    final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredTrips = _trips.where((trip) {
-        final title = trip['tipsTitle']?.toString().toLowerCase() ?? '';
-        final destination = trip['destination']?.toString().toLowerCase() ?? '';
-        final startDate = trip['startDate']?.toString().toLowerCase() ?? '';
-        final endDate = trip['endDate']?.toString().toLowerCase() ?? '';
-        final content = trip['content']?.toString().toLowerCase() ?? '';
-        final tips = trip['tips']?.toString().toLowerCase() ?? '';
-        final budget = trip['budget']?.toString().toLowerCase() ?? '';
-        final notes = trip['notes']?.toString().toLowerCase() ?? '';
-        
-        return title.contains(query) || 
-               destination.contains(query) || 
-               startDate.contains(query) || 
-               endDate.contains(query) || 
-               content.contains(query) || 
-               tips.contains(query) || 
-               budget.contains(query) || 
-               notes.contains(query);
-      }).toList();
+      _filteredTrips = _searchKeyword.isEmpty
+          ? _trips
+          : _trips.where((trip) {
+              final title = trip['tipsTitle']?.toString().toLowerCase() ?? '';
+              final destination = trip['destination']?.toString().toLowerCase() ?? '';
+              final startDate = trip['startDate']?.toString().toLowerCase() ?? '';
+              final endDate = trip['endDate']?.toString().toLowerCase() ?? '';
+              final content = trip['content']?.toString().toLowerCase() ?? '';
+              final tips = trip['tips']?.toString().toLowerCase() ?? '';
+              final budget = trip['budget']?.toString().toLowerCase() ?? '';
+              final notes = trip['notes']?.toString().toLowerCase() ?? '';
+              
+              return title.contains(_searchKeyword.toLowerCase()) || 
+                     destination.contains(_searchKeyword.toLowerCase()) || 
+                     startDate.contains(_searchKeyword.toLowerCase()) || 
+                     endDate.contains(_searchKeyword.toLowerCase()) || 
+                     content.contains(_searchKeyword.toLowerCase()) || 
+                     tips.contains(_searchKeyword.toLowerCase()) || 
+                     budget.contains(_searchKeyword.toLowerCase()) || 
+                     notes.contains(_searchKeyword.toLowerCase());
+            }).toList();
     });
   }
 
@@ -212,15 +214,45 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Travel Tips',
-          // style: TextStyle(
-          //   fontSize: 22,
-          //   fontWeight: FontWeight.bold,
-          //   color: Colors.white,
-          // ),
-        ),
-        //backgroundColor: const Color(0xFFF6B1C3), // Light pink
+        title: _showSearch
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search trips...',
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _searchKeyword = val.trim();
+                  });
+                  _filterTrips();
+                },
+              )
+            : const Text('Travel Tips'),
+        actions: [
+          if (!_showSearch)
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                setState(() {
+                  _showSearch = true;
+                });
+              },
+            ),
+          if (_showSearch)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                setState(() {
+                  _showSearch = false;
+                  _searchKeyword = '';
+                  _searchController.clear();
+                });
+                _filterTrips();
+              },
+            ),
+        ],
         elevation: 0,
       ),
       body: _trips.isEmpty
@@ -253,48 +285,41 @@ class _TravelTipsPageState extends State<TravelTipsPage> {
                 ],
               ),
             )
-          : Column(
-              children: [
-                // Search Box
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search trips by any information...',
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFFB47EB3)),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFB47EB3)),
+          : _filteredTrips.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 64,
+                        color: Colors.grey,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFB47EB3), width: 2),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFFDE2E4).withOpacity(0.3),
-                    ),
-                  ),
-                ),
-                // Trip List
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredTrips.length,
-                    itemBuilder: (context, index) {
-                      final trip = _filteredTrips[index];
-                      return Center(
-                        child: Container(
-                          width: double.infinity,
-                          constraints: const BoxConstraints(maxWidth: 600),
-                          child: _buildTripCard(trip),
+                      SizedBox(height: 16),
+                      Text(
+                        'No trips match your search',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey,
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _filteredTrips.length,
+                  itemBuilder: (context, index) {
+                    final trip = _filteredTrips[index];
+                    return Center(
+                      child: Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: _buildTripCard(trip),
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 60.0),
         child: FloatingActionButton(

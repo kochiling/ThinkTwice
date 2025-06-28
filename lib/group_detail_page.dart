@@ -18,6 +18,8 @@ import 'package:printing/printing.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:thinktwice/group_chat_page.dart';
+import 'package:thinktwice/notifications_page.dart';
+import 'package:thinktwice/notification_icon_with_badge.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -91,6 +93,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
   String? _selectedUserId;
   Map<String, String> memberImages = {};
   List<MapEntry<String, double>> topSpenders = [];
+  List<Map<String, dynamic>> reminders = [];
 
 
   String groupCode = '';
@@ -126,6 +129,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
     _fetchGroupInfo();
     _fetchBalancesExpensesAndSettlements();
     _calculateSpentPerPerson();
+    _fetchReminders();
 
   }
 
@@ -274,9 +278,93 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
 
 
       });
+    });  }
+
+  void _fetchReminders() {
+    final remindersRef = _database.ref('Groups/${widget.groupId}/reminders');
+    remindersRef.onValue.listen((event) {
+      final remindersData = event.snapshot.value as Map<dynamic, dynamic>?;
+      List<Map<String, dynamic>> tempReminders = [];
+      
+      if (remindersData != null) {
+        remindersData.forEach((key, value) {
+          final reminder = Map<String, dynamic>.from(value);
+          reminder['id'] = key;
+          tempReminders.add(reminder);
+        });
+        
+        // Sort by timestamp, newest first
+        tempReminders.sort((a, b) {
+          final aTimestamp = a['timestamp'] ?? 0;
+          final bTimestamp = b['timestamp'] ?? 0;
+          return bTimestamp.compareTo(aTimestamp);
+        });
+      }
+      
+      setState(() {
+        reminders = tempReminders;
+      });
     });
   }
 
+  Future<void> _sendReminder(String debtorId, String creditorId, double amount, String currency) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Only allow creditor to send reminder
+    if (currentUserId != creditorId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You can only send reminders for money owed to you"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final reminder = {
+        'debtorId': debtorId,
+        'creditorId': creditorId,
+        'amount': amount,
+        'currency': currency,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'message': 'Reminder: You owe ${memberNames[creditorId]} $currency ${amount.toStringAsFixed(2)}',
+        'isRead': false,
+        'groupId': widget.groupId,
+      };
+
+      await _database.ref('Groups/${widget.groupId}/reminders').push().set(reminder);
+      
+      // Also add to debtor's personal notifications
+      await _database.ref('Users/$debtorId/notifications').push().set({
+        'type': 'reminder',
+        'groupId': widget.groupId,
+        'groupName': groupName,
+        'creditorId': creditorId,
+        'creditorName': memberNames[creditorId],
+        'amount': amount,
+        'currency': currency,
+        'message': 'Reminder: You owe ${memberNames[creditorId]} $currency ${amount.toStringAsFixed(2)} in $groupName',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'isRead': false,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Reminder sent to ${memberNames[debtorId]}"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to send reminder: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +375,16 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         backgroundColor: const Color(0xfffbe5ec),
         //backgroundColor: const Color(0xFFCDB4DB),
         actions: [
+          NotificationIconWithBadge(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsPage(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
             tooltip: 'Group Chat',
@@ -687,6 +785,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
                       ],
                     ),
                   ),
+                  // Reminder button (only show if current user is the creditor)
+                  if (FirebaseAuth.instance.currentUser?.uid == payeeId) ...[
+                    IconButton(
+                      icon: const Icon(Icons.notifications, color: Colors.orange),
+                      onPressed: () async {
+                        await _sendReminder(payerId, payeeId, amount, currency);
+                      },
+                      tooltip: "Send Reminder",
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xfffbe5ec), // Button background color
@@ -722,6 +831,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
                       final groupRef = FirebaseDatabase.instance
                           .ref('Groups/${widget.groupId}');
                       await groupRef.child('settlement').push().set(newSettlement);
+                      
+                      // Remove related reminder notifications
+                      await _removeRelatedReminders(payerId, payeeId, amount);
+                      
                       await _fetchExpensesAndSetState();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -785,6 +898,39 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
               ),
               const SizedBox(height: 8),
               ...suggestionCards,
+            ],
+            const SizedBox(height: 16),
+            // Reminders section
+            if (reminders.isNotEmpty) ...[
+              const Text(
+                "Recent Reminders:",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF9D4EDD),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...reminders.take(3).map((reminder) {
+                final debtorName = memberNames[reminder['debtorId']] ?? 'Unknown';
+                final creditorName = memberNames[reminder['creditorId']] ?? 'Unknown';
+                final amount = reminder['amount']?.toStringAsFixed(2) ?? '0.00';
+                final currency = reminder['currency'] ?? '';
+                final timestamp = reminder['timestamp'] ?? 0;
+                final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+                final timeAgo = _formatTimeAgo(date);
+                
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: const Icon(Icons.notifications, color: Colors.orange),
+                    title: Text("$creditorName reminded $debtorName"),
+                    subtitle: Text("$currency $amount • $timeAgo"),
+                    dense: true,
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 8),
             ],
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -1352,6 +1498,73 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         ],
       ),
     );
+  }
+
+  Future<void> _removeRelatedReminders(String payerId, String payeeId, double settlementAmount) async {
+    try {
+      // Remove from debtor's personal notifications
+      final debtorNotificationsRef = _database.ref('Users/$payerId/notifications');
+      final debtorNotificationsSnap = await debtorNotificationsRef.get();
+      
+      if (debtorNotificationsSnap.exists) {
+        final notificationsData = debtorNotificationsSnap.value as Map<dynamic, dynamic>;
+        for (var entry in notificationsData.entries) {
+          final notificationKey = entry.key;
+          final notification = Map<String, dynamic>.from(entry.value);
+          
+          // Check if this is a reminder from the creditor about this debt
+          if (notification['type'] == 'reminder' &&
+              notification['creditorId'] == payeeId &&
+              notification['groupId'] == widget.groupId) {
+            final reminderAmount = notification['amount']?.toDouble() ?? 0.0;
+            
+            // Remove if settlement covers the reminder amount
+            if (settlementAmount >= reminderAmount) {
+              await debtorNotificationsRef.child(notificationKey).remove();
+            }
+          }
+        }
+      }
+      
+      // Remove from group reminders
+      final groupRemindersRef = _database.ref('Groups/${widget.groupId}/reminders');
+      final groupRemindersSnap = await groupRemindersRef.get();
+      
+      if (groupRemindersSnap.exists) {
+        final remindersData = groupRemindersSnap.value as Map<dynamic, dynamic>;
+        for (var entry in remindersData.entries) {
+          final reminderKey = entry.key;
+          final reminder = Map<String, dynamic>.from(entry.value);
+          
+          if (reminder['debtorId'] == payerId &&
+              reminder['creditorId'] == payeeId) {
+            final reminderAmount = reminder['amount']?.toDouble() ?? 0.0;
+            
+            // Remove if settlement covers the reminder amount
+            if (settlementAmount >= reminderAmount) {
+              await groupRemindersRef.child(reminderKey).remove();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("Error removing related reminders: $e");
+    }
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 
   Color _getColorForUser(String userId) {
