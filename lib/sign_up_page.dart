@@ -43,6 +43,11 @@ class _SignUpPageState extends State<SignUpPage> {
   UploadTask? uploadTask;
   final ImagePicker _picker = ImagePicker();
 
+  bool _agreedToTerms = false;
+  String? _termsError;
+
+  double _loadingProgress = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -147,52 +152,66 @@ class _SignUpPageState extends State<SignUpPage> {
   _signup() async {
     setState(() {
       _isLoading = true;
+      _loadingProgress = 0.0;
     });
+
+    void updateProgress(double value) {
+      setState(() {
+        _loadingProgress = value.clamp(0.0, 1.0);
+      });
+    }
 
     try {
       final user = await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
+      updateProgress(0.2);
       if (user != null) {
         final uid = FirebaseAuth.instance.currentUser?.uid;
         late DatabaseReference dbref = FirebaseDatabase.instance.ref();
 
-        String imageUrl = 'https://firebasestorage.googleapis.com/v0/b/thinktwice-clzy.firebasestorage.app/o/profile_pic.jpg?alt=media&token=9f2634b8-b271-4f74-923c-36161d2f728a';
-        //String imageUrl = 'https://firebasestorage.googleapis.com/v0/b/thinktwice-clzy.firebasestorage.app/o/profile_pic.jpg?alt=media&token=9f2634b8-b271-4f74-923c-36161d2f728a';
+        String imageUrl = 'https://firebasestorage.googleapis.com/v0/b/thinktwice-clzy.firebasestorage.app/o/profile_pic3.jpg?alt=media&token=0cd568e8-6b1f-4233-a285-2d598cca8db9';
 
         if (_imageFile != null) {
-          // Upload image
           final imgRef = FirebaseStorage.instance
               .ref()
-              .child('Profile_Images/$uid.jpg'); // Use UID as filename
+              .child('Profile_Images/$uid.jpg');
           uploadTask = imgRef.putFile(_imageFile!);
+          uploadTask!.snapshotEvents.listen((event) {
+            if (event.totalBytes > 0) {
+              updateProgress(0.2 + 0.5 * (event.bytesTransferred / event.totalBytes));
+            }
+          });
           final snapshot = await uploadTask!.whenComplete(() => null);
           imageUrl = await snapshot.ref.getDownloadURL();
           log("Custom image uploaded: $imageUrl");
         } else {
           log("No image selected. Using default image.");
         }
-
-        // Save user data
+        updateProgress(0.8);
         await dbref.child('Users').child(uid!).set({
           'id': uid,
           'username': _name.text,
           'email': _email.text,
-          //'country': selectedCountryName ?? '',
           'country': selectedCountryName?.isNotEmpty == true ? selectedCountryName : 'Malaysia',
           'profile_pic': imageUrl,
         });
-
+        updateProgress(1.0);
         log("User created and data saved successfully");
-        goToHome(context);
-
-        setState(() {
-          _isLoading = false;
-        });
+        await Future.delayed(const Duration(milliseconds: 400));
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => CurveBar(selectedIndex: 0)),
+          (Route<dynamic> route) => false,
+        );
       }
     } catch (e) {
       log("Sign Up Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Sign Up Failed: ${e.toString()}")),
+        SnackBar(content: Text("Sign Up Failed: "+e.toString())),
       );
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _loadingProgress = 0.0;
+      });
     }
   }
 
@@ -237,12 +256,15 @@ class _SignUpPageState extends State<SignUpPage> {
       _confirmPasswordError = _confirmpassword.text.isEmpty
           ? 'Confirm Password is required'
           : (_confirmpassword.text != _password.text ? 'Passwords do not match' : null);
+      _termsError = !_agreedToTerms ? 'You must agree to the terms and conditions' : null;
     });
 
     if (_nameError == null &&
         _emailError == null &&
         _passwordError == null &&
-        _confirmPasswordError == null && _confirmpassword.text == _password.text ) {
+        _confirmPasswordError == null &&
+        _agreedToTerms &&
+        _confirmpassword.text == _password.text ) {
       print('Sign Up Successful!');
       _signup();
     }
@@ -251,9 +273,10 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build (BuildContext context){
     return Scaffold(
         backgroundColor: Colors.white,
-
-        body: SafeArea(
-            child: SingleChildScrollView(
+        body: Stack(
+          children: [
+            SafeArea(
+              child: SingleChildScrollView(
                 child: Center(
                   child: Column(
                     spacing: 5,
@@ -451,14 +474,57 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                       ),
 
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: _agreedToTerms,
+                              activeColor: Color(0xFFE991AA),
+                              onChanged: (value) {
+                                setState(() {
+                                  _agreedToTerms = value ?? false;
+                                  if (_agreedToTerms) _termsError = null;
+                                });
+                              },
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _agreedToTerms = !_agreedToTerms;
+                                    if (_agreedToTerms) _termsError = null;
+                                  });
+                                },
+                                child: const Text(
+                                  'I agree to the Terms and Conditions',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_termsError != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 2.0),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _termsError!,
+                              style: TextStyle(color: Colors.red, fontSize: 13),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 30),
                       InkWell(
-                        onTap: _handleSignUp,
+                        onTap: _agreedToTerms ? _handleSignUp : null,
                         child: Container(
                           height: 60,
                           width: 350,
                           decoration: BoxDecoration(
-                            color: Color (0xFFE991AA),
+                            color: _agreedToTerms ? Color (0xFFE991AA) : Colors.grey,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Center(
@@ -505,17 +571,53 @@ class _SignUpPageState extends State<SignUpPage> {
                           ],
                         ),
                       ),
-                      if (_isLoading)
-                        Container(
-                          color: Color(0xFFE991AA),
-                          child: Center(
-                            child: CircularProgressIndicator(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.3),
+                child: Center(
+                  child: SizedBox(
+                    width: 300,
+                    child: Stack(
+                      alignment: Alignment.topLeft,
+                      children: [
+                        // Loading bar
+                        Padding(
+                          padding: const EdgeInsets.only(top: 60.0),
+                          child: LinearProgressIndicator(
+                            value: _loadingProgress,
+                            minHeight: 16,
+                            backgroundColor: Colors.white,
+                            color: Color(0xFFE991AA),
                           ),
                         ),
-                    ],
+                        // Moving image
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 100),
+                          left: (_loadingProgress * 260).clamp(0.0, 260.0),
+                          top: 0,
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: ClipOval(
+                              child: Image.asset(
+                                'images/profile_pic4.jpg',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            )
-        )),
+          ],
+        ),
     );
   }
 }

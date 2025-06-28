@@ -24,6 +24,7 @@ class _AddPostState extends State<AddPost> {
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
   List<File> selectedImages = [];
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -99,7 +100,6 @@ class _AddPostState extends State<AddPost> {
     }
   }
 
-
   Future<void> captureImageFromCamera() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
@@ -116,31 +116,44 @@ class _AddPostState extends State<AddPost> {
       );
       return;
     }
-
-    final postRef = _dbRef.child("Posts").push();
-    final String postId = postRef.key!;
-    List<String> imageUrls = [];
-
-    for (File image in selectedImages) {
-      final fileName = DateTime.now().millisecondsSinceEpoch.toString();
-      final ref = FirebaseStorage.instance.ref().child("PostImages/$fileName.jpg");
-      await ref.putFile(image);
-      final url = await ref.getDownloadURL();
-      imageUrls.add(url);
-    }
-
-    await postRef.set({
-      "postId": postId,
-      "userId": userId,
-      "username": username,
-      "userProfile": profileUrl,
-      "title": titleController.text,
-      "description": descriptionController.text,
-      "images": imageUrls,
-      "timestamp": DateTime.now().toString(),
+    setState(() {
+      _isUploading = true;
     });
+    try {
+      final postRef = _dbRef.child("Posts").push();
+      final String postId = postRef.key!;
+      List<String> imageUrls = [];
 
-    Navigator.pop(context);
+      for (File image in selectedImages) {
+        final fileName = DateTime.now().millisecondsSinceEpoch.toString();
+        final ref = FirebaseStorage.instance.ref().child("PostImages/$fileName.jpg");
+        await ref.putFile(image);
+        final url = await ref.getDownloadURL();
+        imageUrls.add(url);
+      }
+
+      await postRef.set({
+        "postId": postId,
+        "userId": userId,
+        "username": username,
+        "userProfile": profileUrl,
+        "title": titleController.text,
+        "description": descriptionController.text,
+        "images": imageUrls,
+        "timestamp": DateTime.now().toString(),
+      });
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to upload post. Please try again.")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
   }
 
   Widget buildImagePreview() {
@@ -207,81 +220,97 @@ class _AddPostState extends State<AddPost> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Create Post"),
-        // actions: [
-        //   TextButton.icon(
-        //     onPressed: uploadPost,
-        //     icon: Icon(Icons.send, color: Color(0xFFE991AA)),
-        //     label: Text("Post", style: TextStyle(color: Color(0xFFE991AA))),
-        //   )
-        // ],
-      ),
-      body: username == null
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundImage:
-                  profileUrl != null ? NetworkImage(profileUrl!) : null,
-                  radius: 25,
-                  child: profileUrl == null ? Icon(Icons.person) : null,
-                ),
-                SizedBox(width: 10),
-                Text(username ?? "User", style: TextStyle(fontSize: 18)),
-              ],
-            ),
-            SizedBox(height: 20),
-            TextField(
-              controller: titleController,
-              maxLength: 100,
-              decoration: InputDecoration(
-                hintText: "Title",
-                counterText: "",
-              ),
-            ),
-            SizedBox(height: 10),
-            TextField(
-              controller: descriptionController,
-              maxLines: 5,
-              decoration: InputDecoration(
-               hintText: "Description",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 10),
-            buildImagePreview(),
-            SizedBox(height: 30),
-            /// Bottom Post Button
-            Align(
-              alignment: FractionalOffset.bottomCenter,
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: uploadPost,
-                  icon: Icon(Icons.send),
-                  label: Text("Post"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFE991AA),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: Text("Create Post"),
+            // actions: [
+            //   TextButton.icon(
+            //     onPressed: uploadPost,
+            //     icon: Icon(Icons.send, color: Color(0xFFE991AA)),
+            //     label: Text("Post", style: TextStyle(color: Color(0xFFE991AA))),
+            //   )
+            // ],
+          ),
+          body: username == null
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundImage:
+                                profileUrl != null ? NetworkImage(profileUrl!) : null,
+                            radius: 25,
+                            child: profileUrl == null ? Icon(Icons.person) : null,
+                          ),
+                          SizedBox(width: 10),
+                          Text(username ?? "User", style: TextStyle(fontSize: 18)),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      TextField(
+                        controller: titleController,
+                        maxLength: 100,
+                        decoration: InputDecoration(
+                          hintText: "Title",
+                          counterText: "",
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          hintText: "Description",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      buildImagePreview(),
+                      SizedBox(height: 30),
+                      /// Bottom Post Button
+                      Align(
+                        alignment: FractionalOffset.bottomCenter,
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: uploadPost,
+                            icon: Icon(Icons.send),
+                            label: Text("Post"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFFE991AA),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+        ),
+        if (_isUploading)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFFE991AA)),
+                  SizedBox(height: 16),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }

@@ -120,24 +120,47 @@ class _GroupChatPageState extends State<GroupChatPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Create Poll'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: const [
+                  Icon(Icons.poll, color: Color(0xFF9D4EDD)),
+                  SizedBox(width: 8),
+                  Text('Create Poll', style: TextStyle(color: Color(0xFF9D4EDD), fontWeight: FontWeight.bold)),
+                ],
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TextField(
                       controller: questionController,
-                      decoration: const InputDecoration(labelText: 'Poll Question'),
+                      decoration: InputDecoration(
+                        labelText: 'Poll Question',
+                        labelStyle: TextStyle(color: Color(0xFF9D4EDD)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Color(0xFF9D4EDD), width: 2),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     ...List.generate(choiceControllers.length, (i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
                         children: [
                           Expanded(
                             child: TextField(
                               controller: choiceControllers[i],
-                              decoration: InputDecoration(labelText: 'Choice ${i + 1}'),
+                              decoration: InputDecoration(
+                                labelText: 'Choice ${i + 1}',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Color(0xFF9D4EDD), width: 2),
+                                ),
+                              ),
                             ),
                           ),
                           if (choiceControllers.length > 2)
@@ -156,8 +179,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Add Choice'),
+                          icon: const Icon(Icons.add, size: 18, color: Color(0xFF9D4EDD)),
+                          label: const Text('Add Choice', style: TextStyle(color: Color(0xFF9D4EDD))),
                           onPressed: () {
                             setState(() {
                               choiceControllers.add(TextEditingController());
@@ -168,12 +191,18 @@ class _GroupChatPageState extends State<GroupChatPage> {
                   ],
                 ),
               ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               actions: [
                 TextButton(
-                  child: const Text('Cancel'),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                   onPressed: () => Navigator.pop(context),
                 ),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF9D4EDD),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   child: const Text('Send'),
                   onPressed: () {
                     final question = questionController.text.trim();
@@ -286,12 +315,26 @@ class _GroupChatPageState extends State<GroupChatPage> {
     }
   }
 
+  Future<void> _deleteChatMessage(String messageKey) async {
+    try {
+      await _chatRef.child('Groups/${widget.groupId}/chat/$messageKey').remove();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message deleted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete message: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      //backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(groupName.isNotEmpty ? "${groupName}'s Chat Room" : 'Group Chat'),
-        backgroundColor: const Color(0xFFF6DFEC),
+        backgroundColor: const Color(0xfffbe5ec),
       ),
       body: Stack(
         children: [
@@ -330,11 +373,35 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         if (msg.type == 'poll') {
                           return _buildPollCard(msg, isMe, pollKey: key);
                         }
-                        if (isMe) {
-                          return ChatSenderCard(message: msg);
-                        } else {
-                          return ChatReceiverCard(message: msg);
-                        }
+                        return GestureDetector(
+                          onLongPress: isMe
+                              ? () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                    ),
+                                    builder: (context) {
+                                      return Wrap(
+                                        children: [
+                                          ListTile(
+                                            leading: const Icon(Icons.delete, color: Colors.red),
+                                            title: const Text('Delete Message'),
+                                            onTap: () async {
+                                              Navigator.pop(context);
+                                              await _deleteChatMessage(key);
+                                            },
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                }
+                              : null,
+                          child: isMe
+                              ? ChatSenderCard(message: msg)
+                              : ChatReceiverCard(message: msg),
+                        );
                       },
                     );
                   },
@@ -359,28 +426,28 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           PopupMenuItem(
                             value: 2,
                             child: Row(
-                              children: const [Icon(Icons.attach_file, color: Color(0xFF9D4EDD)), SizedBox(width: 8), Text('File')],
+                              children: const [Icon(Icons.camera_alt, color: Color(0xFF9D4EDD)), SizedBox(width: 8), Text('Camera')],
                             ),
                           ),
                           PopupMenuItem(
                             value: 3,
                             child: Row(
-                              children: const [Icon(Icons.camera_alt, color: Color(0xFF9D4EDD)), SizedBox(width: 8), Text('Camera')],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 4,
-                            child: Row(
                               children: const [Icon(Icons.photo, color: Color(0xFF9D4EDD)), SizedBox(width: 8), Text('Gallery')],
                             ),
                           ),
+                          // PopupMenuItem(
+                          //   value: 4,
+                          //   child: Row(
+                          //     children: const [Icon(Icons.attach_file, color: Color(0xFF9D4EDD)), SizedBox(width: 8), Text('File')],
+                          //   ),
+                          // ),
                         ],
                         onSelected: (value) {
                           if (value == 1) {
                             _showPollDialog();
-                          } else if (value == 3) {
+                          } else if (value == 2) {
                             _pickImage(ImageSource.camera);
-                          } else if (value == 4) {
+                          } else if (value == 3) {
                             _pickImage(ImageSource.gallery);
                           }
                           // TODO: Implement file actions

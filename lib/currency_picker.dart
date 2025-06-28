@@ -26,32 +26,32 @@ class _CurrencySelectorBottomSheetState extends State<CurrencySelectorBottomShee
     fetchCurrencies();
   }
 
-  Future<void> fetchCurrencies() async {
-    try {
-      // Simulated API fetch - replace with your real API call
-      await Future.delayed(Duration(seconds: 1));
-      // Example result from API
-      setState(() {
-        currencyList = ['USD', 'EUR', 'MYR', 'SGD', 'JPY', 'AUD'];
-        isLoading = false;
-      });
-    } catch (e) {
-      print('Failed to fetch currencies: $e');
-    }
-  }
-
   // Future<void> fetchCurrencies() async {
   //   try {
+  //     // Simulated API fetch - replace with your real API call
   //     await Future.delayed(Duration(seconds: 1));
-  //     final codes = await CurrencyApi.getCurrencies();
+  //     // Example result from API
   //     setState(() {
-  //       currencyList = codes;
+  //       currencyList = ['USD', 'EUR', 'MYR', 'SGD', 'JPY', 'AUD'];
   //       isLoading = false;
   //     });
   //   } catch (e) {
-  //     print("Error loading currencies: $e");
+  //     print('Failed to fetch currencies: $e');
   //   }
   // }
+
+  Future<void> fetchCurrencies() async {
+    try {
+      await Future.delayed(Duration(seconds: 1));
+      final codes = await CurrencyApi.getCurrencies();
+      setState(() {
+        currencyList = codes;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading currencies: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

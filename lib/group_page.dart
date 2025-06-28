@@ -21,6 +21,9 @@ class _GroupPageState extends State <GroupPage>{
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref("Groups");
   List<GroupModel> userGroups = [];
   bool isLoading = true;
+  String _searchKeyword = '';
+  TextEditingController _searchController = TextEditingController();
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -278,24 +281,68 @@ class _GroupPageState extends State <GroupPage>{
 
 
   Widget build (BuildContext context){
+    final filteredGroups = _searchKeyword.isEmpty
+        ? userGroups
+        : userGroups.where((group) {
+            final name = group.groupName.toLowerCase();
+            final code = (group.groupCode ?? '').toLowerCase();
+            return name.contains(_searchKeyword.toLowerCase()) || code.contains(_searchKeyword.toLowerCase());
+          }).toList();
     return SafeArea(
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text('Groups'),
+          title: _showSearch
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Search groups...',
+                    border: InputBorder.none,
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchKeyword = val.trim();
+                    });
+                  },
+                )
+              : const Text('Groups'),
+          actions: [
+            if (!_showSearch)
+              IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () {
+                  setState(() {
+                    _showSearch = true;
+                  });
+                },
+              ),
+            if (_showSearch)
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() {
+                    _showSearch = false;
+                    _searchKeyword = '';
+                    _searchController.clear();
+                  });
+                },
+              ),
+          ],
         ),
         body: isLoading
             ? const Center(child: CircularProgressIndicator())
-            : userGroups.isEmpty
-            ? const Center(child: Text("You are not in any groups."))
+            : filteredGroups.isEmpty
+            ? const Center(child: Text("No groups found."))
             : ListView.builder(
           padding: const EdgeInsets.only(top: 1, bottom: 1, right: 2, left: 2),
-          itemCount: userGroups.length,
+          itemCount: filteredGroups.length,
           itemBuilder: (context, index) {
-            final group = userGroups[index];
+            final group = filteredGroups[index];
             return GroupCard(
               groupModel: group,
               update: (id, updated) {},
+              highlight: _searchKeyword,
             );
           },
         ),
