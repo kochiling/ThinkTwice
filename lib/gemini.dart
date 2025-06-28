@@ -25,10 +25,29 @@ class _GeminiPageState extends State<GeminiPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gemini Trip Planner'),
-        backgroundColor: Color(0xFFF6B1C3),
+        title: const Text(
+          'AI Trip Planner',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: const Color(0xFFB47EB3),
         centerTitle: true,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          if (!_isLoading && _geminiOutput != null)
+            IconButton(
+              onPressed: _showSaveDialog,
+              icon: const Icon(Icons.bookmark_add, color: Colors.white),
+              tooltip: 'Save Trip',
+            ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -39,31 +58,92 @@ class _GeminiPageState extends State<GeminiPage> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Input fields in a card (now at the top)
+              // Welcome Header
               Container(
                 width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 500),
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.symmetric(horizontal: 0),
+                padding: const EdgeInsets.all(24),
+                margin: const EdgeInsets.only(bottom: 32),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB47EB3).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.flight_takeoff,
+                        size: 40,
+                        color: Color(0xFFB47EB3),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Plan Your Perfect Trip',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB47EB3),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Let AI create the perfect itinerary for your next adventure',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              // Input fields in a card
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 600),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.95),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, 8),
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 25,
+                      offset: const Offset(0, 15),
                     ),
                   ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildCard(
+                    const Text(
+                      'Trip Information',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB47EB3),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    _buildModernCard(
                       child: TextField(
                         controller: _destinationController,
                         decoration: const InputDecoration(
@@ -73,8 +153,8 @@ class _GeminiPageState extends State<GeminiPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildCard(
+                    const SizedBox(height: 20),
+                    _buildModernCard(
                       child: TextField(
                         controller: _peopleController,
                         keyboardType: TextInputType.number,
@@ -85,8 +165,8 @@ class _GeminiPageState extends State<GeminiPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildCard(
+                    const SizedBox(height: 20),
+                    _buildModernCard(
                       child: ListTile(
                         title: Text(
                           _startDate == null
@@ -98,8 +178,8 @@ class _GeminiPageState extends State<GeminiPage> {
                         onTap: () => _pickDate(isStartDate: true),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildCard(
+                    const SizedBox(height: 20),
+                    _buildModernCard(
                       child: ListTile(
                         title: Text(
                           _endDate == null
@@ -111,20 +191,43 @@ class _GeminiPageState extends State<GeminiPage> {
                         onTap: () => _pickDate(isStartDate: false),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _submitTrip,
-                      icon: const Icon(Icons.flight_takeoff, color: Color(0xFFB47EB3)),
-                      label: const Text('Plan My Trip'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFFF6B1C3),
-                        foregroundColor: Color(0xFFB47EB3),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                    const SizedBox(height: 32),
+                    Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFB47EB3), Color(0xFF8C6BB1)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
                         ),
-                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        elevation: 2,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFB47EB3).withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _submitTrip,
+                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                        label: const Text(
+                          'Generate Trip Plan',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -132,54 +235,116 @@ class _GeminiPageState extends State<GeminiPage> {
               ),
               const SizedBox(height: 32),
               if (_isLoading)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 40),
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
                   child: Column(
-                    children: const [
-                      CircularProgressIndicator(color: Color(0xFFB47EB3)),
-                      SizedBox(height: 16),
-                      Text('Generating your trip plan...', style: TextStyle(color: Color(0xFFB47EB3), fontWeight: FontWeight.bold)),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB47EB3).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const CircularProgressIndicator(
+                          color: Color(0xFFB47EB3),
+                          strokeWidth: 3,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Creating Your Perfect Trip...',
+                        style: TextStyle(
+                          color: Color(0xFFB47EB3),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Our AI is crafting a personalized itinerary just for you',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),
               if (!_isLoading && _geminiOutput != null)
                 Container(
                   width: double.infinity,
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  margin: const EdgeInsets.only(bottom: 24),
-                  padding: const EdgeInsets.all(20),
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  margin: const EdgeInsets.only(top: 32, bottom: 24),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.98),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 18,
-                        offset: Offset(0, 10),
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 25,
+                        offset: const Offset(0, 15),
                       ),
                     ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        _geminiOutput!,
-                        style: const TextStyle(fontSize: 16, color: Color(0xFFB47EB3)),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: _showSaveDialog,
-                        icon: const Icon(Icons.save, color: Colors.white),
-                        label: const Text('Save Trip'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFFB47EB3),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFB47EB3).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.travel_explore,
+                              color: Color(0xFFB47EB3),
+                              size: 24,
+                            ),
                           ),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          elevation: 2,
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Your Trip Plan',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFB47EB3),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDE2E4).withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFB47EB3).withOpacity(0.2),
+                          ),
+                        ),
+                        child: Text(
+                          _geminiOutput!,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF2D2D2D),
+                            height: 1.6,
+                          ),
                         ),
                       ),
                     ],
@@ -200,6 +365,30 @@ class _GeminiPageState extends State<GeminiPage> {
       color: Colors.white.withOpacity(0.9),
       child: Padding(
         padding: const EdgeInsets.all(12),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildModernCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFB47EB3).withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: const Color(0xFFB47EB3).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: child,
       ),
     );
