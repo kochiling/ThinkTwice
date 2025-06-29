@@ -301,6 +301,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
   @override
   void initState() {
     super.initState();
+    // Debug print for current user info
+    debugPrint('GroupChatPage: currentUserId = \\${widget.currentUserId}');
+    debugPrint('GroupChatPage: currentUsername = \\${widget.currentUsername}');
+    debugPrint('GroupChatPage: currentUserProfile = \\${widget.currentUserProfile}');
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     _fetchGroupName();
   }
@@ -334,7 +338,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       //backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(groupName.isNotEmpty ? "${groupName}'s Chat Room" : 'Group Chat'),
-        backgroundColor: const Color(0xfffbe5ec),
+        backgroundColor: const Color(0xffdcadd5),
       ),
       body: Stack(
         children: [
@@ -450,7 +454,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           } else if (value == 3) {
                             _pickImage(ImageSource.gallery);
                           }
-                          // TODO: Implement file actions
                         },
                       ),
                       const SizedBox(width: 6),

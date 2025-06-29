@@ -41,7 +41,7 @@ class ChatReceiverCard extends StatelessWidget {
                 Text(
                   message.senderName,
                   style: const TextStyle(
-                    color: Color(0xFF9D4EDD),
+                    color: Color(0xFF000000),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -71,7 +71,7 @@ class ChatReceiverCard extends StatelessWidget {
                 else
                   Text(
                     message.text,
-                    style: const TextStyle(color: Color(0xFF9D4EDD), fontSize: 16),
+                    style: const TextStyle(color: Color(0xFF000000), fontSize: 16),
                   ),
                 const SizedBox(height: 4),
                 Row(
