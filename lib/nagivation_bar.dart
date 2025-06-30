@@ -1,8 +1,6 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:thinktwice/fetch_data.dart';
 import 'package:thinktwice/home_page.dart';
-import 'package:thinktwice/insert_page.dart';
 import 'package:thinktwice/profile_page.dart';
 import 'package:thinktwice/group_page.dart';
 import 'package:thinktwice/travel_tips.dart';

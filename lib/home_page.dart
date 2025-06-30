@@ -80,6 +80,19 @@ class _HomePageState extends State<HomePage> {
         final postMap = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
         final posts = postMap.entries.toList();
 
+        // Sort posts by timestamp descending (latest first)
+        posts.sort((a, b) {
+          final aTimestamp = a.value['timestamp'];
+          final bTimestamp = b.value['timestamp'];
+          final aTime = aTimestamp is int
+              ? aTimestamp
+              : DateTime.tryParse(aTimestamp?.toString() ?? '')?.millisecondsSinceEpoch ?? 0;
+          final bTime = bTimestamp is int
+              ? bTimestamp
+              : DateTime.tryParse(bTimestamp?.toString() ?? '')?.millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+        });
+
         return Padding(
           padding: const EdgeInsets.all(8.0),
           child: RefreshIndicator(

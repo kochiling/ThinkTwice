@@ -314,8 +314,6 @@ class _GroupPageState extends State <GroupPage>{
                     Expanded(
                       child: Text(_showArchived ? 'Archived Groups' : 'Groups'),
                     ),
-                    if (_showArchived)
-                      const Icon(Icons.archive, color: Colors.orange, size: 20),
                   ],
                 ),
           actions: [
