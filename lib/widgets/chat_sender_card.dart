@@ -74,13 +74,13 @@ class ChatSenderCard extends StatelessWidget {
                   children: [
                     Text(
                       timeString,
-                      style: const TextStyle(color: Colors.white54, fontSize: 10),
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
                     ),
                     if (showDate) ...[
                       const SizedBox(width: 8),
                       Text(
                         dateString,
-                        style: const TextStyle(color: Colors.white54, fontSize: 10),
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
                       ),
                     ],
                   ],
