@@ -7,6 +7,8 @@ class GroupModel {
   final String groupCode;
   final String homeCurrency;
   final int memberCount;
+  final String groupId;
+  final Map<String, dynamic> memberArchive;
 
   GroupModel({
     required this.id,
@@ -17,6 +19,8 @@ class GroupModel {
     required this.groupCode,
     required this.homeCurrency,
     required this.memberCount,
+    required this.groupId,
+    required this.memberArchive,
   });
 
   factory GroupModel.fromMap(Map<dynamic, dynamic> data, String id) {
@@ -31,6 +35,8 @@ class GroupModel {
       groupCode: data['groupCode'] ?? '',
       homeCurrency: data['homeCurrency'] ?? '',
       memberCount: data['memberCount'] ?? 0,
+      groupId: data['groupId'] ?? '',
+      memberArchive: Map<String, dynamic>.from(data ['memberArchive'] ?? {}),
     );
   }
 
