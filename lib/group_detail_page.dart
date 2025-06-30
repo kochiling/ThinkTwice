@@ -423,6 +423,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         memberCount: memberNames.length,
         onAddMember: _handleAddMember,
         onChangeGroupName: _handleChangeGroupName,
+        onExitGroup: _handleExitGroup,
       ),
       body: TabBarView(
         controller: _tabController,
@@ -1651,5 +1652,55 @@ class _GroupDetailsPageState extends State<GroupDetailsPage>
         ),
       ],
     );
+  }
+
+  void _handleExitGroup() async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit Group'),
+        content: const Text('Are you sure you want to exit this group?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final groupRef = _database.ref('Groups/${widget.groupId}');
+      final memberRef = groupRef.child('members/$currentUserId');
+      final memberCountRef = groupRef.child('memberCount');
+      // Remove user from members
+      await memberRef.remove();
+      // Decrement memberCount
+      final memberCountSnap = await memberCountRef.get();
+      int memberCount = 0;
+      if (memberCountSnap.exists) {
+        memberCount = int.tryParse(memberCountSnap.value.toString()) ?? 0;
+      }
+      await memberCountRef.set(memberCount > 0 ? memberCount - 1 : 0);
+      if (mounted) {
+        Navigator.of(context).pop(); // Close drawer
+        Navigator.of(context).pop(); // Go back to previous screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You have exited the group.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to exit group: $e')),
+        );
+      }
+    }
   }
 }

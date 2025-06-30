@@ -24,6 +24,7 @@ class _GroupPageState extends State <GroupPage>{
   String _searchKeyword = '';
   TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -53,11 +54,8 @@ class _GroupPageState extends State <GroupPage>{
         data.forEach((groupId, groupData) {
           if (groupData is Map<dynamic, dynamic>) {
             final members = groupData['members'] as Map<dynamic, dynamic>?;
-            print("Group $groupId members: $members");
-            print("User $userId is a member of group $groupId");
-
-            if (groupData['members'] != null &&
-                groupData['members'][userId] == true) {
+            // Always add if user is a member, regardless of archive status
+            if (members != null && members[userId] == true) {
               final group = GroupModel.fromMap(groupData, groupId);
               groups.add(group);
             }
@@ -281,13 +279,18 @@ class _GroupPageState extends State <GroupPage>{
 
 
   Widget build (BuildContext context){
-    final filteredGroups = _searchKeyword.isEmpty
-        ? userGroups
-        : userGroups.where((group) {
-            final name = group.groupName.toLowerCase();
-            final code = (group.groupCode ?? '').toLowerCase();
-            return name.contains(_searchKeyword.toLowerCase()) || code.contains(_searchKeyword.toLowerCase());
-          }).toList();
+    final userId = _auth.currentUser?.uid;
+    final filteredGroups = userGroups.where((group) {
+      final memberArchive = group.memberArchive;
+      final name = group.groupName.toLowerCase();
+      final code = (group.groupCode ?? '').toLowerCase();
+      final matchesSearch = _searchKeyword.isEmpty || name.contains(_searchKeyword.toLowerCase()) || code.contains(_searchKeyword.toLowerCase());
+      if (_showArchived) {
+        return matchesSearch && memberArchive != null && memberArchive[userId] == true;
+      } else {
+        return matchesSearch && (memberArchive == null || memberArchive[userId] != true);
+      }
+    }).toList();
     return SafeArea(
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -306,7 +309,15 @@ class _GroupPageState extends State <GroupPage>{
                     });
                   },
                 )
-              : const Text('Groups'),
+              : Row(
+                  children: [
+                    Expanded(
+                      child: Text(_showArchived ? 'Archived Groups' : 'Groups'),
+                    ),
+                    if (_showArchived)
+                      const Icon(Icons.archive, color: Colors.orange, size: 20),
+                  ],
+                ),
           actions: [
             if (!_showSearch)
               IconButton(
@@ -314,6 +325,16 @@ class _GroupPageState extends State <GroupPage>{
                 onPressed: () {
                   setState(() {
                     _showSearch = true;
+                  });
+                },
+              ),
+            if (!_showSearch)
+              IconButton(
+                icon: Icon(_showArchived ? Icons.unarchive : Icons.archive),
+                tooltip: _showArchived ? 'Show Active Groups' : 'Show Archived Groups',
+                onPressed: () {
+                  setState(() {
+                    _showArchived = !_showArchived;
                   });
                 },
               ),
@@ -333,16 +354,82 @@ class _GroupPageState extends State <GroupPage>{
         body: isLoading
             ? const Center(child: CircularProgressIndicator())
             : filteredGroups.isEmpty
-            ? const Center(child: Text("No groups found."))
+            ? Center(child: Text(_showArchived ? "No archived groups." : "No groups found."))
             : ListView.builder(
           padding: const EdgeInsets.only(top: 1, bottom: 1, right: 2, left: 2),
           itemCount: filteredGroups.length,
           itemBuilder: (context, index) {
             final group = filteredGroups[index];
-            return GroupCard(
-              groupModel: group,
-              update: (id, updated) {},
-              highlight: _searchKeyword,
+            return Dismissible(
+              key: Key(group.groupId + (_showArchived ? '_archived' : '')),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                color: _showArchived ? Colors.green : Colors.orangeAccent,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(_showArchived ? Icons.unarchive : Icons.archive, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(_showArchived ? 'Unarchive' : 'Archive', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              confirmDismiss: (direction) async {
+                return await showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(_showArchived ? 'Unarchive Group' : 'Archive Group'),
+                    content: Text(_showArchived
+                        ? 'Do you want to unarchive "${group.groupName}"?'
+                        : 'Are you sure you want to archive "${group.groupName}"?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text(_showArchived ? 'Unarchive' : 'Archive'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              onDismissed: (direction) async {
+                final userId = _auth.currentUser?.uid;
+                if (userId != null) {
+                  if (_showArchived) {
+                    // Unarchive
+                    await _dbRef.child(group.groupId).child('memberArchive').child(userId).remove();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Group "${group.groupName}" unarchived.')),
+                    );
+                  } else {
+                    // Archive
+                    await _dbRef.child(group.groupId).child('memberArchive').update({userId: true});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Group "${group.groupName}" archived.'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () async {
+                            await _dbRef.child(group.groupId).child('memberArchive').child(userId).remove();
+                            _fetchUserGroups();
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                  _fetchUserGroups();
+                }
+              },
+              child: GroupCard(
+                groupModel: group,
+                update: (id, updated) {},
+                highlight: _searchKeyword,
+              ),
             );
           },
         ),
